@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "zgeoLRp87WMPjZN9KTS3C"
+uri = "file://attached_assets/global-community-rs-chats-transparent.png"
+type = "image"
+title = "RS Chats Logo — Transparent PNG"
+description = "Background-free PNG recreated from the supplied image, ready for use on other backgrounds."
+logical_id = "24f883da-1fdd-46df-aabf-b198d2a62da4"
+content_hash = "sha256:6b89d5750b16e5af91c703d5ac5577184044b1cfd600cfd48794100f279b64b1"
+size = 5140365
+mtime_ms = 1789842349680
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1645cb1b-0e98-4bcd-a2e6-7a10a22863fc/24f883da-1fdd-46df-aabf-b198d2a62da4/c1d535a0-f26b-4767-87af-bfdd022c771f"
+storage_version_token = "1789842362386258"
+content_type = "image/png"
