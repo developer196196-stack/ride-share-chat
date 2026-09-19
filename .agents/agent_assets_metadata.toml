@@ -14,3 +14,17 @@ mtime_ms = 1789842349680
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1645cb1b-0e98-4bcd-a2e6-7a10a22863fc/24f883da-1fdd-46df-aabf-b198d2a62da4/c1d535a0-f26b-4767-87af-bfdd022c771f"
 storage_version_token = "1789842362386258"
 content_type = "image/png"
+
+[[outputs]]
+id = "vYJElH2lp6haZexdDL-sQ"
+uri = "file://attached_assets/global-community-rs-chats-transparent-corrected.png"
+type = "image"
+title = "RS Ride Share Chats — Corrected Transparent PNG"
+description = "Corrected transparent logo with “ide” and “hare” restored to complete “Ride” and “Share.”"
+logical_id = "788f48e2-c9cd-4191-af96-e5cfe06a6e97"
+content_hash = "sha256:437c86b848553bf7f83933be77b2a3ce9528e25b4607b246e0ed7ee7e22b0518"
+size = 1936274
+mtime_ms = 1789842930676
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1645cb1b-0e98-4bcd-a2e6-7a10a22863fc/788f48e2-c9cd-4191-af96-e5cfe06a6e97/ae5709ee-081d-4ad4-bbf8-0a5e68db1eb4"
+storage_version_token = "1789842938978979"
+content_type = "image/png"
