@@ -7,8 +7,7 @@ export function IPhoneSplash() {
     <main
       className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden"
       style={{
-        background:
-          "radial-gradient(circle at 50% 42%, rgba(255,133,150,.68) 0%, rgba(218,68,101,.48) 28%, transparent 60%), linear-gradient(135deg, #8d2644 0%, #c44362 43%, #3a1d32 100%)",
+        background: "#ffffff",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}
     >
@@ -21,23 +20,6 @@ export function IPhoneSplash() {
         .rs-shimmer { animation: rs-shimmer 6s ease-in-out infinite; }
         .rs-pulse { animation: rs-pulse 4.5s ease-in-out infinite; }
       `}</style>
-
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-[15%] top-[7%] h-[38vw] w-[38vw] rounded-full bg-[#ff728b]/55 blur-[90px] rs-drift" />
-        <div className="absolute -right-[14%] bottom-[10%] h-[34vw] w-[34vw] rounded-full bg-[#ff9aab]/38 blur-[100px] rs-drift-delay" />
-        <div
-          className="absolute inset-0 opacity-[.11]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(205,173,177,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(205,173,177,.25) 1px, transparent 1px)",
-            backgroundSize: "52px 52px",
-            maskImage: "radial-gradient(ellipse at center, black, transparent 68%)",
-          }}
-        />
-        <div className="rs-pulse absolute left-1/2 top-1/2 h-[52%] w-[45%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#d8aeb2]/20" />
-        <div className="absolute left-[8%] top-[18%] h-px w-[28%] rotate-[28deg] bg-gradient-to-r from-transparent via-[#d7a1a8]/40 to-transparent" />
-        <div className="absolute bottom-[19%] right-[7%] h-px w-[26%] rotate-[28deg] bg-gradient-to-r from-transparent via-[#d7a1a8]/30 to-transparent" />
-      </div>
 
       <section className="relative flex h-full min-h-[100dvh] w-full items-center justify-center px-5 py-8 sm:px-10">
         <div className="relative w-[min(76vw,334px)] sm:w-[min(39vw,360px)]">
