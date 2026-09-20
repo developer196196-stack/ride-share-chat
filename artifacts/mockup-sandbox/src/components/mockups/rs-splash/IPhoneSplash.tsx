@@ -52,7 +52,7 @@ export function IPhoneSplash() {
                 <div className="rs-shimmer pointer-events-none absolute -left-[40%] top-[-15%] h-[140%] w-[22%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
                 <div className="relative flex h-full flex-col items-center justify-center px-[11%] pb-[5%]">
-                  <div className="mb-[11%] w-[80%] drop-shadow-[0_12px_18px_rgba(0,0,0,.5)]">
+                  <div className="mb-[8%] w-[94%] drop-shadow-[0_12px_18px_rgba(0,0,0,.5)]">
                     <img
                       src={logoPath}
                       alt="RS Ride Share Chats"
