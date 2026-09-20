@@ -61,7 +61,7 @@ export function IPhoneSplash() {
                 className="relative aspect-[9/19.5] overflow-hidden rounded-[3.05rem]"
                 style={{
                   background:
-                    "radial-gradient(circle at 52% 44%, rgba(255,224,218,.9) 0%, rgba(255,157,170,.58) 28%, rgba(214,67,94,.25) 43%, transparent 60%), linear-gradient(160deg, #9d3150 0%, #592238 54%, #171722 100%)",
+                    "radial-gradient(circle at 52% 44%, rgba(255,242,238,.98) 0%, rgba(255,178,190,.68) 28%, rgba(214,67,94,.3) 43%, transparent 60%), linear-gradient(160deg, #9d3150 0%, #592238 54%, #171722 100%)",
                 }}
               >
                 <div className="absolute left-1/2 top-[10px] z-20 h-[25px] w-[38%] -translate-x-1/2 rounded-full bg-[#050507] shadow-[inset_0_1px_2px_rgba(255,255,255,.15)]">
