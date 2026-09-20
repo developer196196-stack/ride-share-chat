@@ -8,7 +8,7 @@ export function IPhoneSplash() {
       className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden"
       style={{
         background:
-          "radial-gradient(circle at 50% 42%, rgba(155,22,40,.34) 0%, rgba(93,12,25,.17) 26%, transparent 53%), linear-gradient(135deg, #160b12 0%, #260b16 46%, #080a10 100%)",
+          "radial-gradient(circle at 50% 42%, rgba(210,49,72,.48) 0%, rgba(139,24,48,.30) 26%, transparent 56%), linear-gradient(135deg, #3a121f 0%, #57172d 46%, #11131a 100%)",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}
     >
@@ -23,8 +23,8 @@ export function IPhoneSplash() {
       `}</style>
 
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-[15%] top-[7%] h-[38vw] w-[38vw] rounded-full bg-[#8f1d31]/20 blur-[90px] rs-drift" />
-        <div className="absolute -right-[14%] bottom-[10%] h-[34vw] w-[34vw] rounded-full bg-[#b42b40]/15 blur-[100px] rs-drift-delay" />
+        <div className="absolute -left-[15%] top-[7%] h-[38vw] w-[38vw] rounded-full bg-[#c92e4b]/35 blur-[90px] rs-drift" />
+        <div className="absolute -right-[14%] bottom-[10%] h-[34vw] w-[34vw] rounded-full bg-[#e04a63]/25 blur-[100px] rs-drift-delay" />
         <div
           className="absolute inset-0 opacity-[.11]"
           style={{
@@ -43,7 +43,7 @@ export function IPhoneSplash() {
         <div className="relative w-[min(76vw,334px)] sm:w-[min(39vw,360px)]">
           <div
             className="absolute -inset-[7%] rounded-[4.6rem] blur-[32px]"
-            style={{ background: "rgba(136, 18, 39, .31)" }}
+            style={{ background: "rgba(194, 35, 62, .42)" }}
           />
           <div className="relative rounded-[3.7rem] p-[2px] shadow-[0_34px_80px_rgba(0,0,0,.56),0_8px_18px_rgba(215,148,157,.14)]"
             style={{
@@ -61,13 +61,13 @@ export function IPhoneSplash() {
                 className="relative aspect-[9/19.5] overflow-hidden rounded-[3.05rem]"
                 style={{
                   background:
-                    "radial-gradient(circle at 52% 44%, rgba(166,31,52,.28), transparent 35%), linear-gradient(160deg, #2c0b15 0%, #13080e 51%, #080a0e 100%)",
+                    "radial-gradient(circle at 52% 44%, rgba(219,49,73,.38), transparent 38%), linear-gradient(160deg, #5a162c 0%, #28101c 51%, #0d1017 100%)",
                 }}
               >
                 <div className="absolute left-1/2 top-[10px] z-20 h-[25px] w-[38%] -translate-x-1/2 rounded-full bg-[#050507] shadow-[inset_0_1px_2px_rgba(255,255,255,.15)]">
                   <div className="absolute right-[20%] top-[8px] h-[6px] w-[6px] rounded-full bg-[#161b27]" />
                 </div>
-                <div className="absolute inset-x-0 top-0 h-[34%] bg-gradient-to-b from-[#702035]/25 to-transparent" />
+                <div className="absolute inset-x-0 top-0 h-[34%] bg-gradient-to-b from-[#b83755]/35 to-transparent" />
                 <div className="rs-shimmer pointer-events-none absolute -left-[40%] top-[-15%] h-[140%] w-[22%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
                 <div className="relative flex h-full flex-col items-center justify-center px-[11%] pb-[5%]">
