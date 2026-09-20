@@ -42,14 +42,13 @@ export function IPhoneSplash() {
               <div
                 className="relative aspect-[9/19.5] overflow-hidden rounded-[3.05rem]"
                 style={{
-                  background:
-                    "radial-gradient(circle at 52% 44%, rgba(255,242,238,.98) 0%, rgba(255,178,190,.68) 28%, rgba(214,67,94,.3) 43%, transparent 60%), linear-gradient(160deg, #9d3150 0%, #592238 54%, #171722 100%)",
+                  background: "#ffffff",
                 }}
               >
                 <div className="absolute left-1/2 top-[10px] z-20 h-[25px] w-[38%] -translate-x-1/2 rounded-full bg-[#050507] shadow-[inset_0_1px_2px_rgba(255,255,255,.15)]">
                   <div className="absolute right-[20%] top-[8px] h-[6px] w-[6px] rounded-full bg-[#161b27]" />
                 </div>
-                <div className="absolute inset-x-0 top-0 h-[34%] bg-gradient-to-b from-[#ff9bab]/45 to-transparent" />
+                <div className="absolute inset-x-0 top-0 h-[34%] bg-gradient-to-b from-white/30 to-transparent" />
                 <div className="rs-shimmer pointer-events-none absolute -left-[40%] top-[-15%] h-[140%] w-[22%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
                 <div className="relative flex h-full flex-col items-center justify-center px-[11%] pb-[5%]">
