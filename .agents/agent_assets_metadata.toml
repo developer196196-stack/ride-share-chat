@@ -28,3 +28,17 @@ mtime_ms = 1789842930676
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1645cb1b-0e98-4bcd-a2e6-7a10a22863fc/788f48e2-c9cd-4191-af96-e5cfe06a6e97/ae5709ee-081d-4ad4-bbf8-0a5e68db1eb4"
 storage_version_token = "1789842938978979"
 content_type = "image/png"
+
+[[outputs]]
+id = "Bo1R00CeXtgbSRCvdwfGn"
+uri = "file://attached_assets/rs-ride-share-chats-global-community-transparent.png"
+type = "image"
+title = "RS Ride Share Chats — Global Community"
+description = "Corrected transparent PNG with “GLOBAL COMMUNITY” added in the upper-left red dimensional style shown in the sample."
+logical_id = "51a20813-c419-40d0-acbb-cd14392416f1"
+content_hash = "sha256:3267f69952c8536fc26b791cfaa0da4917ee10fe535ff96b7854e45fc180834a"
+size = 1968667
+mtime_ms = 1789874402122
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1645cb1b-0e98-4bcd-a2e6-7a10a22863fc/51a20813-c419-40d0-acbb-cd14392416f1/694b33d9-edb9-4384-b51b-88be899f1206"
+storage_version_token = "1789874410340679"
+content_type = "image/png"
