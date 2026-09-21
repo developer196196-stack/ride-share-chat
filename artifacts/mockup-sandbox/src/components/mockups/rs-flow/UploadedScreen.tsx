@@ -1,4 +1,5 @@
 const screens: Record<string, string> = {
+  splash: "rs-screen-01-splash.png",
   profile: "rs-screen-05-profile.png",
   connect: "rs-screen-06-connect.png",
   permissions: "rs-screen-07-permissions.png",
