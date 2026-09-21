@@ -22,6 +22,7 @@ import Permissions from '@/pages/permissions';
 import Validation from '@/pages/validation';
 import Vibe from '@/pages/vibe';
 import Room from '@/pages/room';
+import Report from '@/pages/report';
 import Summary from '@/pages/summary';
 import Grace from '@/pages/grace';
 import Match from '@/pages/match';
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/validation" component={Validation} />
           <Route path="/vibe" component={Vibe} />
           <Route path="/room" component={Room} />
+          <Route path="/report" component={Report} />
           <Route path="/summary" component={Summary} />
           <Route path="/grace" component={Grace} />
           <Route path="/match" component={Match} />

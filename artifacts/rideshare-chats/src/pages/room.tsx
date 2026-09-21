@@ -1,11 +1,9 @@
-import { useState } from "react";
-import { ArrowRight, ArrowUpRight, ChevronRight, Mic, ShieldCheck, Video, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Mic, ShieldCheck, Video } from "lucide-react";
 import { useLocation } from "wouter";
 import { card, avatars, Button, BottomNav } from "@/components/shared";
 
 export default function Room() {
   const [, setLocation] = useLocation();
-  const [showReport, setShowReport] = useState(false);
 
   return (
     <div className="flex min-h-full flex-col pt-5">
@@ -66,7 +64,7 @@ export default function Room() {
             <Video size={18} />
           </button>
           <button 
-            onClick={() => setShowReport(true)} 
+            onClick={() => setLocation("/report")} 
             className="col-span-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold transition-colors hover:bg-slate-50 text-slate-800 shadow-sm"
           >
             <ShieldCheck size={17} className="text-[#d7192b]" /> Report
@@ -80,34 +78,6 @@ export default function Room() {
           Disconnect &amp; view ride summary
         </button>
 
-        {showReport && (
-          <div className="fixed inset-0 z-50 flex items-end bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowReport(false)}>
-            <div className="w-full rounded-t-[30px] bg-white p-6 shadow-[0_-20px_50px_rgba(20,30,50,0.16)]" onClick={e => e.stopPropagation()}>
-              <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-200" />
-              <div className="mt-6 flex items-center justify-between">
-                <h2 className="text-xl font-black">Quick report</h2>
-                <button onClick={() => setShowReport(false)} className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200 transition-colors"><X size={18} /></button>
-              </div>
-              <p className="mt-2 text-sm text-slate-500">Mute this participant instantly and log a safety incident.</p>
-              
-              <div className="mt-5 space-y-2">
-                {["Harassment or unsafe conduct", "Spam or inappropriate content", "Something else"].map(x => (
-                  <button 
-                    onClick={() => setShowReport(false)} 
-                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left text-sm font-bold hover:bg-slate-50 transition-colors" 
-                    key={x}
-                  >
-                    {x}<ChevronRight size={16} className="text-slate-400" />
-                  </button>
-                ))}
-              </div>
-              
-              <div className="mt-4">
-                <Button secondary onClick={() => setShowReport(false)}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       <BottomNav />
     </div>
