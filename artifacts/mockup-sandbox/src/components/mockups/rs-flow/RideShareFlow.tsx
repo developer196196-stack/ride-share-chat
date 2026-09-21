@@ -118,18 +118,18 @@ function BottomNav({ onHistory, onSettings }: { onHistory: () => void; onSetting
 
 function Onboarding({ onNext }: { onNext: () => void }) {
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><BrandMark /><div><p className="text-sm font-black">Rideshare Chats</p><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#bd2438]">Global Community</p></div></div>
-        <span className="text-xs font-bold text-slate-500">Skip</span>
-      </div>
-      <div className="mt-8 overflow-hidden rounded-[26px] bg-[#181d2b] p-5 text-white shadow-2xl">
-        <div className="flex items-center justify-between"><span className={`${pill} border-white/20 bg-white/10 text-white`}><span className="h-2 w-2 rounded-full bg-emerald-400" /> Live room preview</span><span className="font-mono text-[10px] text-red-300">100% IN-TRANSIT</span></div>
-        <div className="mt-8 text-center"><p className="text-4xl font-black italic tracking-[-0.12em] text-slate-200">RS</p><p className="mt-1 text-xl font-black tracking-[0.18em]">RIDESHARE CHATS</p><p className="mt-2 text-xs text-slate-300">Meet while you move.</p></div>
-        <div className="mt-6 grid grid-cols-3 gap-1.5">{["MA", "LU", "EL", "DA", "ZA", "SA", "DE", "LE", "YO"].map((a, i) => <div key={i} className="flex h-14 items-end rounded-lg border border-white/20 bg-gradient-to-br from-slate-500 to-slate-800 p-1 text-[9px] font-bold text-white">{a}</div>)}</div>
-        <div className="mt-5 flex items-center justify-between text-[10px] text-slate-300"><span>9-seat rolling rooms</span><span>Instant matchmaking</span></div>
-      </div>
-      <div className="mt-auto pt-6"><Button onClick={onNext}>Verify Your Ride &amp; Join <ArrowRight size={18} /></Button><div className="mt-4 flex justify-center gap-5 text-[10px] font-semibold text-slate-500"><span><ShieldCheck className="mr-1 inline text-emerald-500" size={13} />Secure validation</span><span><LockKeyhole className="mr-1 inline text-[#d7192b]" size={13} />Live moderation</span></div></div>
+    <div className="relative mx-auto min-h-full w-full max-w-[390px] overflow-hidden rounded-[34px] bg-white">
+      <img
+        className="block h-auto w-full select-none"
+        src="/__mockup/images/rs-flow-onboarding-reference.png"
+        alt="Rideshare Chats onboarding screen with live room preview and Verify Your Ride & Join button"
+      />
+      <button
+        type="button"
+        onClick={onNext}
+        aria-label="Verify your ride and join"
+        className="absolute left-[12.5%] top-[83%] h-[6.5%] w-[75%] rounded-[18px] bg-transparent focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#d7192b]"
+      />
     </div>
   );
 }
