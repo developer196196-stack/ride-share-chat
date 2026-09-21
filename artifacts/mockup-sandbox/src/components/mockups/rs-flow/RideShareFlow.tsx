@@ -287,7 +287,13 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
 }
 
 export function RideShareFlow() {
-  const [screen, setScreen] = useState<Screen>("onboarding");
+  const requestedScreen =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("screen")
+      : null;
+  const initialScreen: Screen =
+    requestedScreen === "onboarding2" ? "onboarding2" : "onboarding";
+  const [screen, setScreen] = useState<Screen>(initialScreen);
   const go = (next: Screen) => setScreen(next);
   const shell = "min-h-screen bg-[#f8fafc] px-5 py-5 font-sans text-slate-900";
   return (
