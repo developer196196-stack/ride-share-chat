@@ -402,10 +402,10 @@ export function RideShareFlow() {
     requestedScreen === "onboarding2" ? "onboarding2" : "onboarding";
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const go = (next: Screen) => setScreen(next);
-  const shell = "min-h-screen bg-[#f8fafc] px-5 py-5 font-sans text-slate-900";
+  const shell = "min-h-screen bg-[#f8fafc] px-6 py-6 font-sans text-slate-900 md:px-10 md:py-10";
   return (
     <main className={shell}>
-      <div className="mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-[390px] flex-col">
+      <div className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[520px] flex-col md:min-h-[calc(100vh-80px)] md:max-w-[560px]">
         {screen === "onboarding" && <Onboarding onNext={() => go("onboarding2")} />}
         {screen === "onboarding2" && <OnboardingSecond onNext={() => go("rules")} onHowItWorks={() => go("rules")} />}
         {screen === "rules" && <Rules onNext={() => go("auth")} onBack={() => go("onboarding2")} />}
