@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Rideshare Chats"
+description = "A responsive, interactive rideshare community application that verifies active trips, guides passengers through onboarding, and connects verified riders in live rolling video rooms."
+version = "1.0.0"
+id = "artifacts/rideshare-chats"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19742
+
+[services.development]
+run = "pnpm --filter @workspace/rideshare-chats run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rideshare-chats", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/rideshare-chats/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19742"
+BASE_PATH = "/"
