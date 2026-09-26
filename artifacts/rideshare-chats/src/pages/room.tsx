@@ -1,85 +1,79 @@
-import { ArrowRight, ArrowUpRight, Mic, ShieldCheck, Video } from "lucide-react";
+import { ShieldCheck, Timer } from "lucide-react";
 import { useLocation } from "wouter";
-import { card, avatars, Button, BottomNav } from "@/components/shared";
+import { BottomNav } from "@/components/shared";
+import { DebugPanel } from "@/components/room/DebugPanel";
+import { RoomGrid } from "@/components/room/RoomGrid";
+import { TransitCompletion } from "@/components/room/TransitCompletion";
+import { useTransitState } from "@/hooks/useTransitState";
+
+function formatTime(seconds: number) {
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 export default function Room() {
   const [, setLocation] = useLocation();
+  const { transitState, secondsRemaining, dispatchPayload } = useTransitState();
+  const isGrace = transitState === "GRACE_PERIOD_PENDING";
 
   return (
-    <div className="flex min-h-full flex-col pt-5">
-      <div className="flex min-h-full flex-col px-5 relative pb-20">
-        <div className="flex items-center justify-between">
-          <span className="rounded-full bg-[#d7192b] px-3 py-2 text-xs font-black text-white shadow-sm">Party Mode</span>
-          <button 
-            onClick={() => setLocation("/grace")} 
-            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-600 transition-colors hover:bg-amber-100"
-          >
-            Grace: 03:42
-          </button>
-          <button 
-            onClick={() => setLocation("/match")} 
-            className="rounded-full bg-[#d7192b] px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-[#c41f36]"
-          >
-            Next Room <ArrowRight className="ml-1 inline" size={13} />
-          </button>
-        </div>
-        
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {[["You", "CA"], ...avatars].map(([name, loc], i) => (
-            <div 
-              className={`relative aspect-[0.82] overflow-hidden rounded-[17px] border-2 ${
-                i === 0 ? "border-red-400" : i === 1 ? "border-emerald-400" : "border-white"
-              } bg-gradient-to-br ${
-                i % 2 ? "from-slate-300 to-slate-500" : "from-amber-200 to-slate-500"
-              } p-2 shadow-sm`} 
-              key={name}
-            >
-              <div className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-1 text-[9px] font-bold text-white backdrop-blur-sm">
-                {name} ({loc})
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className={`${card} mt-4 p-4 text-xs leading-5 text-slate-500`}>
-          <p><strong className="text-emerald-500">Maya:</strong> Heading to JFK airport right now</p>
-          <p><strong className="text-[#d7192b]">David:</strong> Traffic in Seattle is wild today.</p>
-        </div>
-        
-        <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          <span className="rounded-full bg-slate-100 px-3 py-2 text-xs whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors">Vibe</span>
-          <span className="rounded-full bg-slate-100 px-3 py-2 text-xs whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors">Traffic</span>
-          <span className="rounded-full bg-slate-100 px-3 py-2 text-xs whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors">Hello</span>
-        </div>
-        
-        <div className="mt-3 flex items-center rounded-full border border-slate-200 bg-white px-4 py-3 text-xs text-slate-400 cursor-text shadow-sm">
-          Drop a quick message... <ArrowUpRight className="ml-auto text-[#d7192b]" size={16} />
-        </div>
-        
-        <div className="mt-auto grid grid-cols-4 gap-2 border-t border-slate-200 pt-4 bg-[#f8fafc]">
-          <button className="flex h-12 items-center justify-center rounded-2xl bg-slate-100 transition-colors hover:bg-slate-200 text-slate-700">
-            <Mic size={18} />
-          </button>
-          <button className="flex h-12 items-center justify-center rounded-2xl bg-slate-100 transition-colors hover:bg-slate-200 text-slate-700">
-            <Video size={18} />
-          </button>
-          <button 
-            onClick={() => setLocation("/report")} 
-            className="col-span-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold transition-colors hover:bg-slate-50 text-slate-800 shadow-sm"
-          >
-            <ShieldCheck size={17} className="text-[#d7192b]" /> Report
-          </button>
-        </div>
-        
-        <button 
-          onClick={() => setLocation("/summary")} 
-          className="mt-4 pb-2 text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          Disconnect &amp; view ride summary
-        </button>
+    <main className="flex min-h-[100dvh] flex-col bg-[#f8fafc] sm:min-h-[796px]" data-testid="screen-rolling-room">
+      <div className="relative flex flex-1 flex-col px-5 pb-5 pt-5">
+        <DebugPanel transitState={transitState} onPayload={dispatchPayload} />
 
+        {transitState === "DISCONNECTED" ? (
+          <TransitCompletion />
+        ) : (
+          <>
+            <div className="mb-4 mt-5 flex items-center justify-between gap-2">
+              <div>
+                <span className="rounded-full bg-[#d7192b] px-3 py-1.5 text-[10px] font-black text-white">Party Mode</span>
+                <h1 className="mt-3 text-xl font-black tracking-tight text-slate-950">Rolling Room</h1>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocation("/report")}
+                className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700"
+                data-testid="button-report-room"
+              >
+                <ShieldCheck size={14} className="text-[#d7192b]" aria-hidden="true" /> Report
+              </button>
+            </div>
+
+            <RoomGrid dimmed={isGrace} onNext={() => setLocation("/match")} />
+
+            {isGrace && (
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6">
+                <section
+                  role="dialog"
+                  aria-labelledby="traffic-grace-title"
+                  className="pointer-events-auto w-full rounded-[28px] border border-amber-100 bg-white p-6 text-center shadow-[0_25px_70px_rgba(15,23,42,0.25)]"
+                  data-testid="modal-traffic-grace"
+                >
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                    <Timer size={27} aria-hidden="true" />
+                  </div>
+                  <h2 id="traffic-grace-title" className="mt-5 text-xl font-black text-slate-950">
+                    Traffic Grace Period Active
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Your room is paused while we wait for your ride to move again.
+                  </p>
+                  <div className="mt-5 rounded-2xl bg-amber-50 px-4 py-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Time remaining</p>
+                    <p className="mt-1 font-mono text-4xl font-black tabular-nums text-amber-700" role="timer" data-testid="timer-grace">
+                      {formatTime(secondsRemaining)}
+                    </p>
+                  </div>
+                  <p className="mt-4 text-xs text-slate-500">
+                    Use “Simulate Motion Resumed” above to return to the room.
+                  </p>
+                </section>
+              </div>
+            )}
+          </>
+        )}
       </div>
-      <BottomNav />
-    </div>
+      {transitState !== "DISCONNECTED" && <BottomNav />}
+    </main>
   );
 }

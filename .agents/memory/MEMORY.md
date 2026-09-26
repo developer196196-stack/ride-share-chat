@@ -1,0 +1,1 @@
+- [Rideshare frontend framework](rideshare-frontend-framework.md) — integrate prototype prompts into the existing React/Vite app unless migration is explicitly requested.
