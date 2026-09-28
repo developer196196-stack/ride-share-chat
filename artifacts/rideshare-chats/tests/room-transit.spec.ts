@@ -97,6 +97,26 @@ test("manual ride-end payload disconnects immediately and removes every seat", a
   await expectCompletion(page);
 });
 
+test("Back to rooms returns to vibe selection after ride completion", async ({ page }) => {
+  await openRoom(page);
+  await page.getByTestId("button-simulate-ride-end").click();
+  await expectCompletion(page);
+
+  await page.getByRole("button", { name: "Back to rooms" }).click();
+  await expect(page).toHaveURL(/\/vibe$/);
+  await expect(page.getByRole("heading", { name: "Choose your vibe" })).toBeVisible();
+});
+
+test("View ride summary opens the summary page after ride completion", async ({ page }) => {
+  await openRoom(page);
+  await page.getByTestId("button-simulate-ride-end").click();
+  await expectCompletion(page);
+
+  await page.getByRole("button", { name: "View ride summary" }).click();
+  await expect(page).toHaveURL(/\/summary$/);
+  await expect(page.getByRole("heading", { name: "Ride session completed" })).toBeVisible();
+});
+
 test("Next remains reachable on a short mobile screen and opens matchmaking", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 480 });
   await openRoom(page);
