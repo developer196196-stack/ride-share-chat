@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/rideshare-chats-site/"
+title = "Ride Share Chats Website"
+description = "A responsive editorial marketing website recreating the supplied Ride Share Chats landing-page screenshot, with product room previews, trust explanation, and FAQs."
+version = "1.0.0"
+id = "artifacts/rideshare-chats-site"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/rideshare-chats-site/" ]
+localPort = 23614
+
+[services.development]
+run = "pnpm --filter @workspace/rideshare-chats-site run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rideshare-chats-site", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/rideshare-chats-site/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23614"
+BASE_PATH = "/rideshare-chats-site/"
