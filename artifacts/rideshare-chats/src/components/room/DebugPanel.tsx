@@ -14,6 +14,18 @@ const simulations: {
     testId: "button-simulate-red-light",
   },
   {
+    label: "Simulate Speed 15mph (Threshold)",
+    payload: { type: "SENSOR_UPDATE", speedMph: 15 },
+    icon: Activity,
+    testId: "button-simulate-speed-threshold",
+  },
+  {
+    label: "Simulate Speed 20mph (Above Threshold)",
+    payload: { type: "SENSOR_UPDATE", speedMph: 20 },
+    icon: Activity,
+    testId: "button-simulate-speed-above-threshold",
+  },
+  {
     label: "Simulate Motion Resumed",
     payload: { type: "MOTION_RESUMED" },
     icon: Play,
@@ -35,7 +47,7 @@ export function DebugPanel({
   onPayload: (payload: TransitPayload) => void;
 }) {
   return (
-    <section className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm" aria-label="Sensor simulator" data-testid="panel-sensor-simulator">
+    <section className="relative z-30 rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm" aria-label="Sensor simulator" data-testid="panel-sensor-simulator">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
           <Activity size={14} className="text-[#d7192b]" />

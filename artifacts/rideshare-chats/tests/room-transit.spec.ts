@@ -36,6 +36,41 @@ test("red-light sensor payload starts five-minute grace, counts down, and expire
   await expectCompletion(page);
 });
 
+test("speed at and above 15 mph does not pause the active room", async ({ page }) => {
+  await openRoom(page);
+
+  for (const testId of ["button-simulate-speed-threshold", "button-simulate-speed-above-threshold"]) {
+    await page.getByTestId(testId).click();
+    await expect(page.getByTestId("status-transit-state")).toHaveText("ACTIVE_TRANSIT");
+    await expect(page.getByTestId("modal-traffic-grace")).toHaveCount(0);
+    await expect(page.getByTestId("grid-room-seats")).toHaveAttribute("aria-hidden", "false");
+  }
+
+  await page.clock.runFor(300_000);
+  await expect(page.getByTestId("status-transit-state")).toHaveText("ACTIVE_TRANSIT");
+});
+
+test("repeated red-light samples preserve the first grace deadline", async ({ page }) => {
+  await openRoom(page);
+  const redLight = page.getByTestId("button-simulate-red-light");
+  await redLight.click();
+  await page.clock.runFor(61_000);
+  await expect(page.getByTestId("timer-grace")).toHaveText("03:59");
+
+  await redLight.click();
+  await expect(page.getByTestId("timer-grace")).toHaveText("03:59");
+  await page.clock.runFor(238_000);
+  await expect(page.getByTestId("timer-grace")).toHaveText("00:01");
+  await redLight.click();
+  await expect(page.getByTestId("timer-grace")).toHaveText("00:01");
+  await page.clock.runFor(1_000);
+  await expectCompletion(page);
+
+  // Late slow samples must not bring back a completed room.
+  await redLight.click();
+  await expectCompletion(page);
+});
+
 test("motion resumed cancels grace and restores the undimmed room and timer", async ({ page }) => {
   await openRoom(page);
   await page.getByTestId("button-simulate-red-light").click();
