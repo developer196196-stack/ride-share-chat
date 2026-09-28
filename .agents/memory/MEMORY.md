@@ -1,1 +1,2 @@
 - [Rideshare frontend framework](rideshare-frontend-framework.md) — integrate prototype prompts into the existing React/Vite app unless migration is explicitly requested.
+- [Workspace test tooling installs](workspace-test-tooling.md) — package installer cannot pass pnpm workspace-root flags; use an explicit root-scoped install for shared test tools.
