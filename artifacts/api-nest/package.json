@@ -1,0 +1,43 @@
+{
+  "name": "@workspace/api-nest",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "predev": "pnpm --filter @workspace/firebase run build && pnpm --filter @workspace/api-zod run build && node scripts/copy-openapi.js",
+    "dev": "node scripts/dev.js",
+    "prebuild": "pnpm --filter @workspace/firebase run build && pnpm --filter @workspace/api-zod run build",
+    "build": "nest build && node scripts/copy-openapi.js",
+    "start": "node dist/main.js",
+    "pretypecheck": "pnpm --filter @workspace/firebase run build && pnpm --filter @workspace/api-zod run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/validation/validation.engine.test.ts",
+    "e2e": "node scripts/e2e-smoke.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/translate": "^10.1.1",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/platform-socket.io": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/websockets": "^11.1.6",
+    "@workspace/api-zod": "workspace:*",
+    "@workspace/firebase": "workspace:*",
+    "firebase-admin": "^13.6.0",
+    "ioredis": "^5.11.1",
+    "js-yaml": "^4.1.0",
+    "livekit-server-sdk": "^2.19.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.10",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "catalog:",
+    "typescript": "~5.9.3",
+    "tsx": "catalog:"
+  }
+}

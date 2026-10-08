@@ -48,3 +48,13 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment — never commit secrets (use Replit Secrets or local .env)
+.env
+.env.*
+!.env.example
+!**/.env.example
+.info.txt
+
+sleek-temp-ref/
+

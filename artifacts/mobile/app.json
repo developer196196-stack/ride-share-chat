@@ -1,0 +1,115 @@
+{
+  "expo": {
+    "name": "Rideshare Chats",
+    "slug": "rideshare-chats",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon.png",
+    "scheme": "ridesharechats",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ridesharechats.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMotionUsageDescription": "Rideshare Chats uses motion data to confirm you are riding in a vehicle (Trip Validation).",
+        "NSLocationWhenInUseUsageDescription": "Rideshare Chats uses your location to verify you are in transit and to share live trip status with people you choose.",
+        "NSCameraUsageDescription": "Rideshare Chats uses the camera for live video in R.O.O.M.s.",
+        "NSMicrophoneUsageDescription": "Rideshare Chats uses the microphone for live audio in R.O.O.M.s.",
+        "NSContactsUsageDescription": "Rideshare Chats lets you pick trusted contacts for safety alerts.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.ridesharechats.mobile",
+      "allowBackup": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACTIVITY_RECOGNITION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "READ_CONTACTS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/app-icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Rideshare Chats needs photo library access to set your profile photo.",
+          "cameraPermission": "Rideshare Chats needs camera access to take your profile photo."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo-full.png",
+          "resizeMode": "contain",
+          "imageWidth": 220,
+          "backgroundColor": "#F8FAFC"
+        }
+      ],
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Rideshare Chats uses the camera for live video in R.O.O.M.s.",
+          "microphonePermission": "Rideshare Chats uses the microphone for live audio in R.O.O.M.s."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Rideshare Chats uses your location to verify you are in transit and to share live trip status with people you choose."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Rideshare Chats uses motion data to confirm you are riding in a vehicle (Trip Validation)."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Rideshare Chats lets you pick trusted contacts for safety alerts."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Rideshare Chats uses the camera for live video in R.O.O.M.s.",
+          "microphonePermission": "Rideshare Chats uses the microphone for live audio in R.O.O.M.s.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      }
+    }
+  }
+}

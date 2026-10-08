@@ -2,21 +2,34 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.3.0
+  description: |
+    Rideshare Chats API (NestJS, artifacts/api-nest).
+    Auth: Firebase ID tokens via `Authorization: Bearer <token>`.
+    Firestore and Storage are accessed only by the Nest Admin SDK — never by mobile clients.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Session bootstrap and the signed-in rider's profile (Firebase ID token)
+  - name: validation
+    description: Trip Validation Engine (telemetry, state)
+  - name: rooms
+    description: R.O.O.M. matchmaking, video access, chat history and ride summaries
+  - name: preferences
+    description: Language / translation preferences and trusted contacts
+  - name: safety
+    description: Live status share links, safety alerts and reports
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
+      description: Returns server health status and whether Firebase Admin is configured
       responses:
         "200":
           description: Healthy
@@ -24,13 +37,1163 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /v1/auth/bootstrap:
+    post:
+      operationId: bootstrapAuth
+      tags: [auth]
+      summary: Create or refresh the rider record after phone sign-in
+      description: |
+        Call right after Firebase phone verification succeeds. Creates `users/{uid}` on first
+        sign-in (phone number is taken from the verified ID token, never from the body) and
+        returns the rider profile. Safe to call repeatedly.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthBootstrapRequest"
+      responses:
+        "200":
+          description: Rider profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/auth/me:
+    get:
+      operationId: getAuthMe
+      tags: [auth]
+      summary: Current rider profile
+      description: Returns the profile for the Firebase UID in the Bearer ID token.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rider profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No rider record yet — call bootstrapAuth first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+    patch:
+      operationId: updateAuthMe
+      tags: [auth]
+      summary: Save the rider profile (Profile Setup screen)
+      description: |
+        Sets display name, home city, ride style, incognito shield and (optionally) the avatar
+        uploaded via `createProfilePhotoUpload`. The profile counts as complete once display
+        name, home city and ride style are all set.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiderProfileRequest"
+      responses:
+        "200":
+          description: Updated rider profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No rider record yet — call bootstrapAuth first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/auth/me/photo-upload:
+    post:
+      operationId: createProfilePhotoUpload
+      tags: [auth]
+      summary: Get a signed URL to upload a profile photo
+      description: |
+        Returns a short-lived signed Firebase Storage URL. PUT the image bytes to `uploadUrl`
+        with the same `Content-Type`, then send `storagePath` as `photoStoragePath` in updateAuthMe.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfilePhotoUploadRequest"
+      responses:
+        "200":
+          description: Signed upload target
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilePhotoUpload"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/validation/telemetry:
+    post:
+      operationId: submitTelemetry
+      tags: [validation]
+      summary: Submit a Trip Validation telemetry sample
+      description: |
+        REST fallback for the `TELEMETRY` WebSocket event. Send GPS (Module 1), vibration
+        FFT summary (Module 2) and OS activity (Module 3). Returns the rider's current
+        validation snapshot. Recommended cadence: every 2 s before verification, 10 s in a R.O.O.M.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelemetrySample"
+      responses:
+        "200":
+          description: Validation snapshot after applying the sample
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/validation/state:
+    get:
+      operationId: getValidationState
+      tags: [validation]
+      summary: Current Trip Validation state
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Validation snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/validation/reset:
+    post:
+      operationId: resetValidation
+      tags: [validation]
+      summary: Start a new validation session (back to PENDING)
+      description: Used after a session was TERMINATED, or to start a new ride.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Fresh validation snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/vibes:
+    get:
+      operationId: listVibes
+      tags: [rooms]
+      summary: Live R.O.O.M. counts per vibe
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: One entry per vibe
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VibeStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current:
+    get:
+      operationId: getCurrentRoom
+      tags: [rooms]
+      summary: The rider's current R.O.O.M. (if any)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current session, or `room = null`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentRoomResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/join:
+    post:
+      operationId: joinRoom
+      tags: [rooms]
+      summary: Join a R.O.O.M. for a vibe
+      description: |
+        Requires validation state VERIFIED. The matchmaker places the rider in the fullest
+        open R.O.O.M. for the vibe that contains nobody they recently skipped, or opens a new one.
+        Returns the LiveKit connection details.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRoomRequest"
+      responses:
+        "200":
+          description: Room session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Not VERIFIED (code `NOT_VERIFIED`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/next:
+    post:
+      operationId: nextRoom
+      tags: [rooms]
+      summary: Instant Escape — skip to another R.O.O.M.
+      description: |
+        Leaves the current R.O.O.M., blocks its members from being matched with the rider for
+        60 minutes, and joins another R.O.O.M. of the same vibe.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: New room session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Not VERIFIED or not in a room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/leave:
+    post:
+      operationId: leaveRoom
+      tags: [rooms]
+      summary: Leave the current R.O.O.M. and end the ride session
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ride summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/messages:
+    get:
+      operationId: listRoomMessages
+      tags: [rooms]
+      summary: Recent chat messages in the current R.O.O.M. (translated for the caller)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rides:
+    get:
+      operationId: listRides
+      tags: [rooms]
+      summary: The rider's recent validated rides (newest first)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Up to 20 rides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RideSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/me/preferences:
+    get:
+      operationId: getPreferences
+      tags: [preferences]
+      summary: Language, translation, subtitle and safety preferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Preferences (defaults when never saved)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preferences"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+    put:
+      operationId: updatePreferences
+      tags: [preferences]
+      summary: Save preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Preferences"
+      responses:
+        "200":
+          description: Saved preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preferences"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/me/trusted-contacts:
+    get:
+      operationId: listTrustedContacts
+      tags: [preferences]
+      summary: Trusted contacts for safety alerts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrustedContact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+    post:
+      operationId: createTrustedContact
+      tags: [preferences]
+      summary: Add a trusted contact (max 5)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrustedContactInput"
+      responses:
+        "200":
+          description: Created contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustedContact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/me/trusted-contacts/{contactId}:
+    delete:
+      operationId: deleteTrustedContact
+      tags: [preferences]
+      summary: Remove a trusted contact
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/safety/share-links:
+    post:
+      operationId: createShareLink
+      tags: [safety]
+      summary: Create (or reuse) a live trip status link
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareLinkRequest"
+      responses:
+        "200":
+          description: Share link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareLink"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/safety/alerts:
+    post:
+      operationId: createSafetyAlert
+      tags: [safety]
+      summary: Record a safety alert and get the message to send
+      description: |
+        Records the alert and returns a share link plus a ready-to-send message. In phase one the
+        app opens the phone's own SMS / WhatsApp / email app pre-filled with it; nothing is sent
+        by the server.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SafetyAlertRequest"
+      responses:
+        "200":
+          description: Alert recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafetyAlertResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/public/share/{token}:
+    get:
+      operationId: getPublicShare
+      tags: [safety]
+      summary: Public live trip status (no auth)
+      description: Powers the public status page at `/api/share/{token}`.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicShareStatus"
+        "404":
+          description: Unknown link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/reports:
+    post:
+      operationId: createReport
+      tags: [safety]
+      summary: Report a participant or R.O.O.M.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "200":
+          description: Report recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  responses:
+    Unauthorized:
+      description: Missing or invalid Firebase ID token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: A required backend service (Redis, Firebase, LiveKit) is not configured
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    FirebaseUnavailable:
+      description: Firebase Admin is not configured on the server
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
+          enum: [ok]
+        firebaseConfigured:
+          type: boolean
+        redisConfigured:
+          type: boolean
+        livekitConfigured:
+          type: boolean
+        roadsConfigured:
+          type: boolean
       required:
         - status
-
+        - firebaseConfigured
+        - redisConfigured
+        - livekitConfigured
+        - roadsConfigured
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code (e.g. AUTH_UNAUTHORIZED, VALIDATION_ERROR)
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+      required:
+        - code
+        - message
+    RideStyle:
+      type: string
+      enum: [party_tech, networking, deep_talks, just_chilling]
+      description: Vibe badge shown to other riders
+    AuthBootstrapRequest:
+      type: object
+      properties:
+        countryCode:
+          type: string
+          description: ISO 3166-1 alpha-2 of the dial code picked on the Authentication screen
+          pattern: "^[A-Z]{2}$"
+    RiderProfile:
+      type: object
+      properties:
+        uid:
+          type: string
+        phoneNumber:
+          type: ["string", "null"]
+          description: E.164 number verified by Firebase
+        countryCode:
+          type: ["string", "null"]
+        displayName:
+          type: ["string", "null"]
+        homeCity:
+          type: ["string", "null"]
+        rideStyle:
+          oneOf:
+            - $ref: "#/components/schemas/RideStyle"
+            - type: "null"
+        incognitoDropoff:
+          type: boolean
+        photoUrl:
+          type: ["string", "null"]
+          description: Short-lived signed download URL for the avatar
+        profileComplete:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - uid
+        - phoneNumber
+        - countryCode
+        - displayName
+        - homeCity
+        - rideStyle
+        - incognitoDropoff
+        - photoUrl
+        - profileComplete
+        - createdAt
+        - updatedAt
+    UpdateRiderProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 3
+          maxLength: 24
+          pattern: "^[A-Za-z0-9._]+$"
+          description: Letters, numbers, dots and underscores
+        homeCity:
+          type: string
+          minLength: 2
+          maxLength: 60
+        rideStyle:
+          $ref: "#/components/schemas/RideStyle"
+        incognitoDropoff:
+          type: boolean
+        photoStoragePath:
+          type: string
+          description: "`storagePath` returned by createProfilePhotoUpload"
+      required:
+        - displayName
+        - homeCity
+        - rideStyle
+        - incognitoDropoff
+    ProfilePhotoUploadRequest:
+      type: object
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+      required:
+        - contentType
+    ProfilePhotoUpload:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        storagePath:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - uploadUrl
+        - storagePath
+        - expiresAt
+    ValidationState:
+      type: string
+      enum: [PENDING, VERIFIED, GRACE, TERMINATED]
+    ActivityType:
+      type: string
+      enum: [in_vehicle, on_bicycle, on_foot, walking, running, still, unknown]
+    GpsReading:
+      type: object
+      description: Module 1 — one GPS fix
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        speedMps:
+          type: ["number", "null"]
+          description: OS-reported speed in m/s (null when unavailable)
+        accuracyM:
+          type: number
+          minimum: 0
+        timestamp:
+          type: number
+          description: Fix time, ms since epoch
+        isMock:
+          type: boolean
+      required: [lat, lng, speedMps, accuracyM, timestamp, isMock]
+    VibrationReading:
+      type: object
+      description: Module 2 — summary of a 3-second FFT window
+      properties:
+        vehicleBandRatio:
+          type: number
+          minimum: 0
+          maximum: 1
+        dominantHz:
+          type: number
+          minimum: 0
+        rmsMps2:
+          type: number
+          minimum: 0
+        walkingScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        shakeScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        sampleRateHz:
+          type: number
+          minimum: 0
+      required: [vehicleBandRatio, dominantHz, rmsMps2, walkingScore, shakeScore, sampleRateHz]
+    ActivityReading:
+      type: object
+      description: Module 3 — OS activity recognition
+      properties:
+        type:
+          $ref: "#/components/schemas/ActivityType"
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 100
+      required: [type, confidence]
+    TelemetrySample:
+      type: object
+      properties:
+        gps:
+          $ref: "#/components/schemas/GpsReading"
+        vibration:
+          $ref: "#/components/schemas/VibrationReading"
+        activity:
+          $ref: "#/components/schemas/ActivityReading"
+        device:
+          type: object
+          properties:
+            isEmulator:
+              type: boolean
+            isRooted:
+              type: boolean
+        simulated:
+          type: boolean
+          description: Dev-only simulated ride (rejected unless the server allows it)
+        preferredLanguage:
+          type: string
+          maxLength: 16
+    ModuleScores:
+      type: object
+      properties:
+        gps:
+          type: ["number", "null"]
+        vibration:
+          type: ["number", "null"]
+        groundTruth:
+          type: ["number", "null"]
+      required: [gps, vibration, groundTruth]
+    ValidationSnapshot:
+      type: object
+      properties:
+        state:
+          $ref: "#/components/schemas/ValidationState"
+        score:
+          type: number
+        speedMph:
+          type: number
+        modules:
+          $ref: "#/components/schemas/ModuleScores"
+        checks:
+          type: object
+          properties:
+            gpsSpeedLock:
+              type: boolean
+            vibration:
+              type: ["boolean", "null"]
+            groundTruth:
+              type: ["boolean", "null"]
+            onRoad:
+              type: ["boolean", "null"]
+          required: [gpsSpeedLock, vibration, groundTruth, onRoad]
+        graceDeadline:
+          type: ["string", "null"]
+          format: date-time
+        graceRemainingSec:
+          type: ["number", "null"]
+        terminationReason:
+          type: ["string", "null"]
+          enum: [spoof_detected, exited_vehicle, grace_expired, signal_lost, user_ended, null]
+        thresholds:
+          description: Active engine thresholds (configurable on the server via VALIDATION_* env)
+          type: object
+          properties:
+            entryMph:
+              type: number
+            entrySustainSec:
+              type: number
+            graceMph:
+              type: number
+            graceDurationSec:
+              type: number
+            verifiedScore:
+              type: number
+          required: [entryMph, entrySustainSec, graceMph, graceDurationSec, verifiedScore]
+        updatedAt:
+          type: string
+          format: date-time
+      required: [state, score, speedMph, modules, checks, graceDeadline, graceRemainingSec, terminationReason, thresholds, updatedAt]
+    Vibe:
+      type: string
+      enum: [party_mode, networking, deep_talks, just_chilling]
+    VibeStats:
+      type: object
+      properties:
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+        rooms:
+          type: number
+        riders:
+          type: number
+        openSeats:
+          type: number
+      required: [vibe, rooms, riders, openSeats]
+    JoinRoomRequest:
+      type: object
+      properties:
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+      required: [vibe]
+    RoomMember:
+      type: object
+      properties:
+        uid:
+          type: string
+        displayName:
+          type: string
+        homeCity:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        isSelf:
+          type: boolean
+      required: [uid, displayName, homeCity, photoUrl, isSelf]
+    LiveKitConnection:
+      type: object
+      properties:
+        url:
+          type: string
+        token:
+          type: string
+      required: [url, token]
+    RoomSession:
+      type: object
+      properties:
+        roomId:
+          type: string
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+        capacity:
+          type: number
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomMember"
+        livekit:
+          description: Null when video is not configured on the server
+          oneOf:
+            - $ref: "#/components/schemas/LiveKitConnection"
+            - type: "null"
+        joinedAt:
+          type: string
+          format: date-time
+      required: [roomId, vibe, capacity, members, livekit, joinedAt]
+    CurrentRoomResponse:
+      type: object
+      properties:
+        room:
+          oneOf:
+            - $ref: "#/components/schemas/RoomSession"
+            - type: "null"
+      required: [room]
+    RideSummary:
+      type: object
+      properties:
+        rideId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        durationSec:
+          type: number
+        roomDurationSec:
+          type: number
+        distanceMiles:
+          type: number
+        avgMph:
+          type: number
+        peersMet:
+          type: number
+        graceCount:
+          type: number
+        graceSeconds:
+          type: number
+        vibe:
+          oneOf:
+            - $ref: "#/components/schemas/Vibe"
+            - type: "null"
+        endReason:
+          type: string
+      required: [rideId, startedAt, endedAt, durationSec, roomDurationSec, distanceMiles, avgMph, peersMet, graceCount, graceSeconds, vibe, endReason]
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+        text:
+          type: string
+          description: Text in the recipient's language
+        original:
+          type: string
+        originalLanguage:
+          type: ["string", "null"]
+        translated:
+          type: boolean
+        targetLanguage:
+          type: ["string", "null"]
+        sentAt:
+          type: string
+          format: date-time
+      required: [id, roomId, senderId, senderName, text, original, originalLanguage, translated, targetLanguage, sentAt]
+    Preferences:
+      type: object
+      properties:
+        nativeLanguage:
+          type: string
+          minLength: 2
+          maxLength: 16
+          description: BCP-47 language code, e.g. en, es, hi, zh-CN
+        autoTranslate:
+          type: boolean
+        subtitleSize:
+          type: string
+          enum: [sm, md, lg]
+        subtitleStyle:
+          type: string
+          enum: [bubble, subtitle]
+        promptShareOnVerified:
+          type: boolean
+          description: Offer a one-tap "Share my trip" when the rider becomes VERIFIED
+      required: [nativeLanguage, autoTranslate, subtitleSize, subtitleStyle, promptShareOnVerified]
+    ContactChannel:
+      type: string
+      enum: [sms, whatsapp, email]
+    TrustedContactInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        phone:
+          type: ["string", "null"]
+          description: E.164, required for sms / whatsapp
+          pattern: "^\\+[1-9]\\d{6,14}$"
+        email:
+          type: ["string", "null"]
+          maxLength: 254
+          description: Required for email (validated server-side)
+        channel:
+          $ref: "#/components/schemas/ContactChannel"
+      required: [name, phone, email, channel]
+    TrustedContact:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        channel:
+          $ref: "#/components/schemas/ContactChannel"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, phone, email, channel, createdAt]
+    ShareLinkRequest:
+      type: object
+      properties:
+        ttlMinutes:
+          type: number
+          minimum: 15
+          maximum: 720
+    ShareLink:
+      type: object
+      properties:
+        token:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required: [token, url, expiresAt]
+    GeoPoint:
+      type: object
+      properties:
+        lat:
+          type: number
+        lng:
+          type: number
+        accuracyM:
+          type: ["number", "null"]
+      required: [lat, lng, accuracyM]
+    SafetyAlertRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [share_status, emergency]
+        location:
+          oneOf:
+            - $ref: "#/components/schemas/GeoPoint"
+            - type: "null"
+      required: [kind]
+    SafetyAlertResult:
+      type: object
+      properties:
+        alertId:
+          type: string
+        shareUrl:
+          type: string
+        message:
+          type: string
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrustedContact"
+      required: [alertId, shareUrl, message, contacts]
+    PublicShareStatus:
+      type: object
+      properties:
+        riderName:
+          type: string
+        active:
+          type: boolean
+        state:
+          oneOf:
+            - $ref: "#/components/schemas/ValidationState"
+            - type: "null"
+        speedMph:
+          type: ["number", "null"]
+        location:
+          oneOf:
+            - $ref: "#/components/schemas/GeoPoint"
+            - type: "null"
+        updatedAt:
+          type: ["string", "null"]
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required: [riderName, active, state, speedMph, location, updatedAt, expiresAt]
+    ReportRequest:
+      type: object
+      properties:
+        roomId:
+          type: ["string", "null"]
+        reportedUid:
+          type: ["string", "null"]
+        reason:
+          type: string
+          enum: [harassment, nudity, hate, violence, minor, spam, other]
+        details:
+          type: ["string", "null"]
+          maxLength: 1000
+      required: [reason]
+    ReportResult:
+      type: object
+      properties:
+        id:
+          type: string
+      required: [id]

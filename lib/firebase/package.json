@@ -1,0 +1,26 @@
+{
+  "name": "@workspace/firebase",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/cjs/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "workspace": "./src/index.ts",
+      "require": "./dist/cjs/index.js",
+      "import": "./src/index.ts",
+      "default": "./dist/cjs/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.cjs.json"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "~5.9.3"
+  }
+}

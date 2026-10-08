@@ -2,11 +2,25 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@10.26.1",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "preinstall": "sh -c 'test -z $EAS_BUILD$CI || exit 0; rm -f package-lock.json yarn.lock; case $npm_config_user_agent in pnpm/*) ;; *) echo Use pnpm instead >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "check": "pnpm run typecheck:libs && pnpm --filter @workspace/mobile run typecheck && pnpm --filter @workspace/api-nest run typecheck",
+    "check:api": "pnpm --filter @workspace/api-nest run typecheck && pnpm --filter @workspace/api-nest run build",
+    "check:mobile": "pnpm --filter @workspace/mobile run typecheck",
+    "mobile": "pnpm --filter @workspace/mobile exec expo start --port 8082",
+    "mobile:clear": "pnpm --filter @workspace/mobile exec expo start --port 8082 --clear",
+    "build:apk": "pnpm --filter @workspace/mobile run build:apk",
+    "build:ios": "pnpm --filter @workspace/mobile run build:ios",
+    "api-nest": "pnpm --filter @workspace/api-nest run dev",
+    "codegen": "pnpm --filter @workspace/api-spec run codegen",
+    "test": "pnpm --filter @workspace/api-nest run test && pnpm --filter @workspace/mobile run test",
+    "e2e": "pnpm --filter @workspace/api-nest run e2e",
+    "build:dev": "pnpm --filter @workspace/mobile run build:dev",
+    "mobile:dev": "pnpm --filter @workspace/mobile exec expo start --dev-client --port 8081"
   },
   "private": true,
   "dependencies": {
