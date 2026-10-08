@@ -1,0 +1,24 @@
+kind = "api"
+previewPath = "/api"
+title = "API Server (NestJS)"
+version = "1.0.0"
+id = "3B4_FFSkEVBkAeYMFRJ2e"
+
+[[services]]
+name = "API Server"
+localPort = 8080
+paths = [ "/api" ]
+ensurePreviewReachable = "/api/healthz"
+
+[services.development]
+run = "pnpm --filter @workspace/api-nest run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/api-nest", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/api-nest", "run", "start" ]
+
+[services.production.env]
+NODE_ENV = "production"
+
+[services.env]
+PORT = "8080"

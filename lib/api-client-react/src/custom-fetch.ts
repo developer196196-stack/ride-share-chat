@@ -17,6 +17,17 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+const DEFAULT_TIMEOUT_MS = 30_000;
+let _timeoutMs: number | null = DEFAULT_TIMEOUT_MS;
+
+/**
+ * Sets how long `customFetch` waits before aborting a request that never
+ * resolves (unreachable host, stalled connection). Pass `null` to disable.
+ * Ignored on any call that already supplies its own `signal`.
+ */
+export function setRequestTimeoutMs(ms: number | null): void {
+  _timeoutMs = ms;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -360,7 +371,25 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  let response: Response;
+  if (init.signal || !_timeoutMs) {
+    response = await fetch(input, { ...init, method, headers });
+  } else {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), _timeoutMs);
+    try {
+      response = await fetch(input, { ...init, method, headers, signal: controller.signal });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(
+          `Network request timed out after ${Math.round(_timeoutMs / 1000)}s. Please check your connection and try again.`,
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

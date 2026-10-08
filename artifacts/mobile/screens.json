@@ -1,0 +1,159 @@
+{
+  "$schema": "screen-registry/v1",
+  "project": "mobile",
+  "description": "Hierarchical screen registry. Reference any screen as Module>section>SCR-CODE-NN (e.g. Rider>onboarding-screens>SCR-ONB-01). All screens are connected to api-nest + Firebase except the onboarding intros (SCR-ONB-01..03).",
+  "modules": {
+    "Rider": {
+      "description": "Screens for the Rider (passenger) role",
+      "onboarding-screens": {
+        "description": "Rider sign-up and onboarding (Sleek 1–7)",
+        "SCR-ONB-01": {
+          "title": "Splash Screen",
+          "sleekNumber": 1,
+          "route": "/rider/onboarding/splash",
+          "file": "artifacts/mobile/app/rider/onboarding/splash.tsx",
+          "source": "sleek-temp-ref/1.-splash-screen.tsx",
+          "description": "Logo splash with live pill and validation progress; auto-advances to SCR-ONB-02 after 3s"
+        },
+        "SCR-ONB-02": {
+          "title": "Onboarding #1 — Meet While You Move",
+          "sleekNumber": 2,
+          "route": "/rider/onboarding/welcome",
+          "file": "artifacts/mobile/app/rider/onboarding/welcome.tsx",
+          "source": "sleek-temp-ref/2.-onboarding--screen--#1.tsx",
+          "description": "Hero card (9-seat rolling rooms) with Verify Your Ride & Join CTA"
+        },
+        "SCR-ONB-03": {
+          "title": "Onboarding #2 — Verified Rides Only",
+          "sleekNumber": 3,
+          "route": "/rider/onboarding/how-it-works",
+          "file": "artifacts/mobile/app/rider/onboarding/how-it-works.tsx",
+          "source": "sleek-temp-ref/3.-onboarding-screen-#2.tsx",
+          "description": "Trip Validation Engine explainer, feature tiles, riders-now card, pager dots"
+        },
+        "SCR-ONB-04": {
+          "title": "Authentication",
+          "sleekNumber": 4,
+          "route": "/rider/onboarding/phone-auth",
+          "file": "artifacts/mobile/app/rider/onboarding/phone-auth.tsx",
+          "source": "sleek-temp-ref/4.-authentication-screen.tsx",
+          "description": "Step 1/4 (dynamic): Firebase phone OTP (country picker, SMS send via reCAPTCHA, 6-digit code with autofill, resend cooldown) → POST /v1/auth/bootstrap → SCR-ONB-05, or SCR-ONB-06 when the profile is already complete",
+          "api": [
+            "POST /v1/auth/bootstrap"
+          ]
+        },
+        "SCR-ONB-05": {
+          "title": "Profile Setup",
+          "sleekNumber": 5,
+          "route": "/rider/onboarding/profile-setup",
+          "file": "artifacts/mobile/app/rider/onboarding/profile-setup.tsx",
+          "source": "sleek-temp-ref/5.-profile-setup-screen.tsx",
+          "description": "Step 2/4 (dynamic): GET /v1/auth/me prefill; display name / home city / ride style / incognito form (react-hook-form + zod); avatar upload via POST /v1/auth/me/photo-upload signed URL; save with PATCH /v1/auth/me",
+          "api": [
+            "GET /v1/auth/me",
+            "PATCH /v1/auth/me",
+            "POST /v1/auth/me/photo-upload"
+          ]
+        },
+        "SCR-ONB-06": {
+          "title": "Rideshare Connect",
+          "sleekNumber": 6,
+          "route": "/rider/onboarding/rideshare-connect",
+          "file": "artifacts/mobile/app/rider/onboarding/rideshare-connect.tsx",
+          "source": "sleek-temp-ref/6.-rideshare-connect-screen.tsx",
+          "description": "Step 3/4: platform picker (Uber, Lyft, Grab, Ola, Bolt, Other) — platform-agnostic, no API linking"
+        },
+        "SCR-ONB-07": {
+          "title": "Permissions",
+          "sleekNumber": 7,
+          "route": "/rider/onboarding/permissions",
+          "file": "artifacts/mobile/app/rider/onboarding/permissions.tsx",
+          "source": "sleek-temp-ref/7.-permissions-screen.tsx",
+          "description": "Step 4/4 (dynamic): requests camera+mic, GPS (required) and motion/activity permissions; shows live status"
+        }
+      },
+      "room-screens": {
+        "description": "Trip validation and rolling video rooms (Sleek 8–13)",
+        "SCR-ROOM-01": {
+          "title": "Trip Validation",
+          "sleekNumber": 8,
+          "route": "/rider/room/validation",
+          "file": "artifacts/mobile/app/rider/room/validation.tsx",
+          "source": "sleek-temp-ref/8.-validation-screen.tsx",
+          "description": "Trip Validation (dynamic): live speed, 3-module checklist, score/state from the engine, share trip status, safety FAB, dev simulator"
+        },
+        "SCR-ROOM-02": {
+          "title": "Vibe Selection",
+          "sleekNumber": 9,
+          "route": "/rider/room/vibe-selection",
+          "file": "artifacts/mobile/app/rider/room/vibe-selection.tsx",
+          "source": "sleek-temp-ref/9.-vibe-selection-screen.tsx",
+          "description": "Vibe Selection (dynamic): live R.O.O.M. counts per vibe, recommended vibe from ride style, join (requires VERIFIED)"
+        },
+        "SCR-ROOM-03": {
+          "title": "Active Room",
+          "sleekNumber": 10,
+          "route": "/rider/room/active-room",
+          "file": "artifacts/mobile/app/rider/room/active-room.tsx",
+          "source": "sleek-temp-ref/10.-active-room-screen.tsx",
+          "description": "Active R.O.O.M. (dynamic): LiveKit 3x3 video, translated chat overlay, grace countdown, Next, mic/cam, report, hang up"
+        },
+        "SCR-ROOM-04": {
+          "title": "Disconnect Summary",
+          "sleekNumber": 11,
+          "route": "/rider/room/ride-summary",
+          "file": "artifacts/mobile/app/rider/room/ride-summary.tsx",
+          "source": "sleek-temp-ref/11.-disconnect-summary-screen.tsx",
+          "description": "Ride Summary (dynamic): duration, distance, peers met, grace stats, end reason, rating, report"
+        },
+        "SCR-ROOM-05": {
+          "title": "Traffic Grace Period",
+          "sleekNumber": 12,
+          "route": "/rider/room/traffic-grace",
+          "file": "artifacts/mobile/app/rider/room/traffic-grace.tsx",
+          "source": "sleek-temp-ref/12.-traffic-grace-period.tsx",
+          "description": "Traffic Grace (dynamic): opens on GRACE in a room, live 5-minute countdown, Stay / Exit, closes on recovery"
+        },
+        "SCR-ROOM-06": {
+          "title": "Fast-Track Matchmaking",
+          "sleekNumber": 13,
+          "route": "/rider/room/fast-track",
+          "file": "artifacts/mobile/app/rider/room/fast-track.tsx",
+          "source": "sleek-temp-ref/13.-fast-track-matchmaking.tsx",
+          "description": "Fast-Track (dynamic): POST /v1/rooms/next — blocks previous riders 60 min and seats the rider in another R.O.O.M."
+        }
+      },
+      "account-screens": {
+        "description": "Connections, history and settings (Sleek 14–15)",
+        "SCR-ACC-01": {
+          "title": "Connections & History",
+          "sleekNumber": 14,
+          "route": "/rider/account/connections",
+          "file": "artifacts/mobile/app/rider/account/connections.tsx",
+          "source": "sleek-temp-ref/14.-connections-&-history.tsx",
+          "description": "Connections & History: real validated-ride history and totals (peer requests coming soon)"
+        },
+        "SCR-ACC-02": {
+          "title": "Settings & Trust Center",
+          "sleekNumber": 15,
+          "route": "/rider/account/settings",
+          "file": "artifacts/mobile/app/rider/account/settings.tsx",
+          "source": "sleek-temp-ref/15.-settings-&-trust-center.tsx",
+          "description": "Settings & Trust Center (dynamic): profile, language/safety links, privacy shields, logout"
+        },
+        "SCR-ACC-03": {
+          "title": "Language & Translation",
+          "route": "/rider/account/language",
+          "file": "artifacts/mobile/app/rider/account/language.tsx",
+          "description": "Native language, auto-translate toggle, subtitle size and style (GET/PUT /v1/me/preferences)"
+        },
+        "SCR-ACC-04": {
+          "title": "Safety & Trusted Contacts",
+          "route": "/rider/account/safety-contacts",
+          "file": "artifacts/mobile/app/rider/account/safety-contacts.tsx",
+          "description": "Trusted contacts (SMS/WhatsApp/email, picker from phone contacts) and \"offer to share when VERIFIED\""
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# EAS Build ignore file for mobile package
+
+node_modules/
+.expo/
+android/
+ios/
+.env*.local
+*.log
