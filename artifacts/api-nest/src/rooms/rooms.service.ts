@@ -11,13 +11,13 @@ import { ProfilesService } from '../profiles/profiles.service';
 import { REDIS } from '../redis/redis.module';
 import { ServerEvents } from '../realtime/realtime.events';
 import { RealtimeService } from '../realtime/realtime.service';
+import { loadAppConfig } from '../config/configuration';
 import { MPS_TO_MPH } from '../validation/validation.config';
 import { ValidationService } from '../validation/validation.service';
 import type { TerminationReason } from '../validation/validation.types';
 import { LiveKitService } from './livekit.service';
 import {
   ROOM_CAPACITY,
-  SKIP_BLOCK_SEC,
   VIBES,
   type RideSummaryDto,
   type RoomMemberDto,
@@ -192,11 +192,12 @@ export class RoomsService implements OnModuleInit {
     if (!roomId) conflict('NOT_IN_ROOM', 'You are not in a R.O.O.M.');
     const vibe = ((await this.redis.hget(keys.room(roomId), 'vibe')) ?? 'party_mode') as Vibe;
     const others = (await this.roomMembers(roomId)).filter((m) => m !== uid);
-    if (others.length > 0) {
+    const blockSec = loadAppConfig().ROOM_SKIP_BLOCK_SEC;
+    if (others.length > 0 && blockSec > 0) {
       const pipeline = this.redis.multi();
       for (const other of others) {
-        pipeline.set(keys.block(uid, other), '1', 'EX', SKIP_BLOCK_SEC);
-        pipeline.set(keys.block(other, uid), '1', 'EX', SKIP_BLOCK_SEC);
+        pipeline.set(keys.block(uid, other), '1', 'EX', blockSec);
+        pipeline.set(keys.block(other, uid), '1', 'EX', blockSec);
       }
       await pipeline.exec();
     }

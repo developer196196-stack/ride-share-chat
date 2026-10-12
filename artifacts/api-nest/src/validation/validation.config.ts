@@ -27,6 +27,22 @@ export const VALIDATION_DEFAULTS = {
   walkingSustainSec: 20,
   signalLostSec: 60,
   spoofChecks: true,
+  lowScoreSustainSec: 10,
+  scoreSmoothing: 0.5,
+  vibrationBandFloor: 0.12,
+  vibrationBandCeil: 0.4,
+  walkingRejectAbove: 0.6,
+  shakeRejectAbove: 0.6,
+  activityMinConfidence: 50,
+  activityStillScore: 40,
+  roadsRecheckSec: 180,
+  roadsMinFixes: 3,
+  roadsMaxFixes: 20,
+  roadsMatchedRatioMin: 0.6,
+  roadsMeanOffsetMaxM: 25,
+  teleportMps: 72,
+  suspicionSustainSec: 30,
+  suspicionPenalty: 25,
 } as const;
 
 type Env = Record<string, string | undefined>;
@@ -63,6 +79,10 @@ export function buildValidationConfig(env: Env = process.env) {
   // Weights are normalised so they always add up to 1.
   const weightSum = rawWeights.gps + rawWeights.vibration + rawWeights.groundTruth || 1;
 
+  // The vibration ratio band maps linearly to 0–100, so the ceiling must stay above the floor.
+  const vibrationFloor = num(env, 'VALIDATION_VIBRATION_BAND_FLOOR', d.vibrationBandFloor, 0, 1);
+  const vibrationCeil = Math.max(num(env, 'VALIDATION_VIBRATION_BAND_CEIL', d.vibrationBandCeil, 0, 1), vibrationFloor + 0.01);
+
   return {
     weights: {
       gps: rawWeights.gps / weightSum,
@@ -95,30 +115,30 @@ export function buildValidationConfig(env: Env = process.env) {
     graceDurationMs: num(env, 'VALIDATION_GRACE_DURATION_SEC', d.graceDurationSec, 10, 3_600) * 1000,
 
     /** VERIFIED → GRACE when the score stays under the VERIFIED band this long (even while moving). */
-    lowScoreSustainMs: 10_000,
+    lowScoreSustainMs: num(env, 'VALIDATION_LOW_SCORE_SUSTAIN_SEC', d.lowScoreSustainSec, 0, 600) * 1000,
 
     /** Module 2 — vibration (vehicle band ratio mapped linearly to 0–100). */
     vibration: {
-      bandRatioFloor: 0.12,
-      bandRatioCeil: 0.4,
-      walkingRejectAbove: 0.6,
-      shakeRejectAbove: 0.6,
+      bandRatioFloor: vibrationFloor,
+      bandRatioCeil: vibrationCeil,
+      walkingRejectAbove: num(env, 'VALIDATION_WALKING_REJECT_ABOVE', d.walkingRejectAbove, 0, 1),
+      shakeRejectAbove: num(env, 'VALIDATION_SHAKE_REJECT_ABOVE', d.shakeRejectAbove, 0, 1),
     },
 
     /** Module 3 — ground truth. */
     activity: {
-      minConfidence: 50,
+      minConfidence: num(env, 'VALIDATION_ACTIVITY_MIN_CONFIDENCE', d.activityMinConfidence, 0, 100),
       /** Points for "still" — a stopped car often reports still. */
-      stillScore: 40,
+      stillScore: num(env, 'VALIDATION_ACTIVITY_STILL_SCORE', d.activityStillScore, 0, 100),
     },
     roads: {
       /** Re-check road matching this often while in a session. */
-      recheckMs: 3 * 60_000,
+      recheckMs: num(env, 'VALIDATION_ROADS_RECHECK_SEC', d.roadsRecheckSec, 10, 3_600) * 1000,
       /** Minimum fixes needed for a road check. */
-      minFixes: 3,
-      maxFixes: 20,
-      matchedRatioMin: 0.6,
-      meanOffsetMaxM: 25,
+      minFixes: num(env, 'VALIDATION_ROADS_MIN_FIXES', d.roadsMinFixes, 1, 100),
+      maxFixes: num(env, 'VALIDATION_ROADS_MAX_FIXES', d.roadsMaxFixes, 1, 100),
+      matchedRatioMin: num(env, 'VALIDATION_ROADS_MATCHED_RATIO_MIN', d.roadsMatchedRatioMin, 0, 1),
+      meanOffsetMaxM: num(env, 'VALIDATION_ROADS_MEAN_OFFSET_MAX_M', d.roadsMeanOffsetMaxM, 1, 1_000),
     },
 
     /** Exit detection: walking cadence or on-foot activity for this long. */
@@ -128,18 +148,18 @@ export function buildValidationConfig(env: Env = process.env) {
     spoof: {
       enabled: bool(env, 'VALIDATION_SPOOF_CHECKS', d.spoofChecks),
       /** Implied speed between consecutive accurate fixes above this is "teleporting" (~160 mph). */
-      teleportMps: 72,
+      teleportMps: num(env, 'VALIDATION_TELEPORT_MPS', d.teleportMps, 1, 1_000),
       /** Moving fast with no vehicle vibration and no in-vehicle activity this long is suspicious. */
-      suspicionSustainMs: 30_000,
+      suspicionSustainMs: num(env, 'VALIDATION_SUSPICION_SUSTAIN_SEC', d.suspicionSustainSec, 1, 600) * 1000,
       /** Score penalty while suspicious. */
-      suspicionPenalty: 25,
+      suspicionPenalty: num(env, 'VALIDATION_SUSPICION_PENALTY', d.suspicionPenalty, 0, 100),
     },
 
     /** No telemetry for this long while VERIFIED moves the rider into GRACE. */
     signalLostMs: num(env, 'VALIDATION_SIGNAL_LOST_SEC', d.signalLostSec, 5, 3_600) * 1000,
 
     /** Score smoothing (exponential moving average weight of the newest sample). */
-    scoreSmoothing: 0.5,
+    scoreSmoothing: num(env, 'VALIDATION_SCORE_SMOOTHING', d.scoreSmoothing, 0.01, 1),
 
     /** Recommended client polling. */
     polling: { preVerificationMs: 2_000, inRoomMs: 10_000 },
@@ -185,6 +205,22 @@ export function relaxedValidationOverrides(env: Env = process.env): string[] {
     ['VALIDATION_WALKING_SUSTAIN_SEC', d.walkingSustainSec],
     ['VALIDATION_SIGNAL_LOST_SEC', d.signalLostSec],
     ['VALIDATION_SPOOF_CHECKS', d.spoofChecks],
+    ['VALIDATION_LOW_SCORE_SUSTAIN_SEC', d.lowScoreSustainSec],
+    ['VALIDATION_SCORE_SMOOTHING', d.scoreSmoothing],
+    ['VALIDATION_VIBRATION_BAND_FLOOR', d.vibrationBandFloor],
+    ['VALIDATION_VIBRATION_BAND_CEIL', d.vibrationBandCeil],
+    ['VALIDATION_WALKING_REJECT_ABOVE', d.walkingRejectAbove],
+    ['VALIDATION_SHAKE_REJECT_ABOVE', d.shakeRejectAbove],
+    ['VALIDATION_ACTIVITY_MIN_CONFIDENCE', d.activityMinConfidence],
+    ['VALIDATION_ACTIVITY_STILL_SCORE', d.activityStillScore],
+    ['VALIDATION_ROADS_RECHECK_SEC', d.roadsRecheckSec],
+    ['VALIDATION_ROADS_MIN_FIXES', d.roadsMinFixes],
+    ['VALIDATION_ROADS_MAX_FIXES', d.roadsMaxFixes],
+    ['VALIDATION_ROADS_MATCHED_RATIO_MIN', d.roadsMatchedRatioMin],
+    ['VALIDATION_ROADS_MEAN_OFFSET_MAX_M', d.roadsMeanOffsetMaxM],
+    ['VALIDATION_TELEPORT_MPS', d.teleportMps],
+    ['VALIDATION_SUSPICION_SUSTAIN_SEC', d.suspicionSustainSec],
+    ['VALIDATION_SUSPICION_PENALTY', d.suspicionPenalty],
   ];
   return keys
     .filter(([key, def]) => {
