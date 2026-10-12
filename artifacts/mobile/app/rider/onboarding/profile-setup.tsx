@@ -25,6 +25,7 @@ import { RIDE_STYLES, rideStyleOption } from '@/constants/ride-styles';
 import { routes } from '@/constants/routes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, ErrorBanner, Icon, OptionSheet, Screen, Toggle } from '@/components/ui';
+import { getOnboardingFlags, routeForSignedInRider } from '@/lib/onboarding';
 import { StepFooter, StepHeader, StepIntro } from '@/components/rideshare';
 import { getApiErrorCode, getApiErrorMessage } from '@/lib/api/error-message';
 import { uploadProfilePhoto } from '@/lib/profile/upload-profile-photo';
@@ -125,7 +126,7 @@ export default function ProfileSetupScreen() {
         },
       });
       queryClient.setQueryData(getGetAuthMeQueryKey(), profile);
-      router.push(routes.rideshareConnect);
+      router.push(routeForSignedInRider(true, await getOnboardingFlags()));
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not save your profile. Try again.'));
     }
@@ -333,7 +334,7 @@ export default function ProfileSetupScreen() {
       </View>
 
       <StepFooter
-        label="Save & Link Rideshare"
+        label="Save & Continue"
         onPress={onSubmit}
         loading={updateMe.isPending}
         disabled={loadingProfile || !me.data || photo?.uploading}

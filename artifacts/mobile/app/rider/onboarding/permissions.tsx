@@ -8,6 +8,7 @@ import { routes } from '@/constants/routes';
 import type { IconName } from '@/constants/icons';
 import { fonts, textSize } from '@/constants/typography';
 import { Card, ErrorBanner, Icon, Screen, Toggle } from '@/components/ui';
+import { markPermissionsDone } from '@/lib/onboarding';
 import { StepFooter, StepHeader, StepIntro } from '@/components/rideshare';
 import { getPermissionStatus, requestPermission, type PermissionKey, type PermissionStatusMap } from '@/lib/permissions';
 
@@ -24,7 +25,7 @@ const PERMISSIONS: { key: PermissionKey; icon: IconName; tint: string; title: st
     icon: 'solarCompassBold',
     tint: colors.accent,
     title: 'High-Precision GPS',
-    caption: 'Verifies vehicle speed > 10 MPH in transit',
+    caption: 'Verifies you are moving in a vehicle',
     required: true,
   },
   {
@@ -73,6 +74,7 @@ export default function PermissionsScreen() {
         setError('Location access is required to verify that you are in transit.');
         return;
       }
+      await markPermissionsDone();
       router.push(routes.validation);
     } finally {
       setBusy(false);
@@ -83,7 +85,7 @@ export default function PermissionsScreen() {
 
   return (
     <Screen spaceBetween contentStyle={styles.content}>
-      <StepHeader step={4} />
+      <StepHeader step={3} />
 
       <View style={styles.body}>
         <StepIntro
@@ -91,7 +93,7 @@ export default function PermissionsScreen() {
           eyebrowIcon="solarShieldWarningBold"
           eyebrowTone="accent"
           title="Device permissions"
-          description="Required to calculate real-time speed, anti-couch spoofing, and 10-seater video rooms."
+          description="Required to calculate real-time speed, anti-couch spoofing, and 9-seater video rooms."
         />
 
         <View style={styles.list}>

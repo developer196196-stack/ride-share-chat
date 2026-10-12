@@ -20,35 +20,34 @@ type Entry = { no: number; title: string; route: AppRoute };
 const SECTIONS: { title: string; subtitle: string; entries: Entry[] }[] = [
   {
     title: 'Onboarding',
-    subtitle: 'Splash → intro → phone → profile → rideshare link → permissions',
+    subtitle: 'Splash → intro → phone → profile → permissions',
     entries: [
       { no: 1, title: 'Splash Screen', route: routes.splash },
       { no: 2, title: 'Onboarding #1 — Meet While You Move', route: routes.welcome },
       { no: 3, title: 'Onboarding #2 — Verified Rides Only', route: routes.howItWorks },
       { no: 4, title: 'Authentication', route: routes.phoneAuth },
       { no: 5, title: 'Profile Setup', route: routes.profileSetup },
-      { no: 6, title: 'Rideshare Connect', route: routes.rideshareConnect },
-      { no: 7, title: 'Permissions', route: routes.permissions },
+      { no: 6, title: 'Permissions', route: routes.permissions },
     ],
   },
   {
     title: 'Rolling Rooms',
     subtitle: 'Trip validation → vibe queue → live room → grace / fast-track → summary',
     entries: [
-      { no: 8, title: 'Trip Validation', route: routes.validation },
-      { no: 9, title: 'Vibe Selection', route: routes.vibeSelection },
-      { no: 10, title: 'Active Room', route: routes.activeRoom },
-      { no: 11, title: 'Disconnect Summary', route: routes.rideSummary },
-      { no: 12, title: 'Traffic Grace Period', route: routes.trafficGrace },
-      { no: 13, title: 'Fast-Track Matchmaking', route: routes.fastTrack },
+      { no: 7, title: 'Trip Validation', route: routes.validation },
+      { no: 8, title: 'Vibe Selection', route: routes.vibeSelection },
+      { no: 9, title: 'Active Room', route: routes.activeRoom },
+      { no: 10, title: 'Disconnect Summary', route: routes.rideSummary },
+      { no: 11, title: 'Traffic Grace Period', route: routes.trafficGrace },
+      { no: 12, title: 'Fast-Track Matchmaking', route: routes.fastTrack },
     ],
   },
   {
     title: 'Account',
     subtitle: 'Connections, trip history, trust & settings',
     entries: [
-      { no: 14, title: 'Connections & History', route: routes.connections },
-      { no: 15, title: 'Settings & Trust Center', route: routes.settings },
+      { no: 13, title: 'Connections & History', route: routes.connections },
+      { no: 14, title: 'Settings & Trust Center', route: routes.settings },
     ],
   },
 ];

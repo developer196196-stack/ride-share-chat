@@ -5,7 +5,6 @@ export const routes = {
   howItWorks: '/rider/onboarding/how-it-works',
   phoneAuth: '/rider/onboarding/phone-auth',
   profileSetup: '/rider/onboarding/profile-setup',
-  rideshareConnect: '/rider/onboarding/rideshare-connect',
   permissions: '/rider/onboarding/permissions',
   validation: '/rider/room/validation',
   vibeSelection: '/rider/room/vibe-selection',

@@ -6,8 +6,8 @@ import { fonts, textSize, tracking } from '@/constants/typography';
 import { IconButton } from '@/components/ui';
 import { LogoTile } from './LogoTile';
 
-/** Back button · RS Chats logo · "Step n/4" header shared by the sign-up screens (4–7). */
-export function StepHeader({ step, total = 4 }: { step: number; total?: number }) {
+/** Back button · RS Chats logo · "Step n/3" header shared by the sign-up screens. */
+export function StepHeader({ step, total = 3 }: { step: number; total?: number }) {
   const router = useRouter();
   return (
     <View style={styles.header}>

@@ -11,6 +11,7 @@ import { routes } from '@/constants/routes';
 import type { IconName } from '@/constants/icons';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Divider, Icon, LiveDot, Pill, Screen } from '@/components/ui';
+import { markIntroSeen } from '@/lib/onboarding';
 import { LogoTile } from '@/components/rideshare';
 
 const FEATURES: { icon: IconName; tint: string; title: string; caption: string }[] = [
@@ -21,7 +22,10 @@ const FEATURES: { icon: IconName; tint: string; title: string; caption: string }
 
 export default function OnboardingHowItWorks() {
   const router = useRouter();
-  const next = () => router.push(routes.phoneAuth);
+  const next = () => {
+    void markIntroSeen();
+    router.push(routes.phoneAuth);
+  };
 
   return (
     <Screen spaceBetween contentStyle={styles.content}>
