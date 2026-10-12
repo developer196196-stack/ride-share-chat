@@ -2,11 +2,8 @@
 export const VIBES = ['party_mode', 'networking', 'deep_talks', 'just_chilling'] as const;
 export type Vibe = (typeof VIBES)[number];
 
-/** You plus 9 other riders. */
-export const ROOM_CAPACITY = 10;
-
-/** How long "Next" keeps skipped riders apart. */
-export const SKIP_BLOCK_SEC = 60 * 60;
+/** 9 seats including the rider. */
+export const ROOM_CAPACITY = 9;
 
 export type RoomMemberDto = {
   uid: string;

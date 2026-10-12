@@ -24,15 +24,23 @@ import { getApiErrorMessage } from '@/lib/api/error-message';
 import { useAuthStore } from '@/stores/auth.store';
 import { useTripStore } from '@/stores/trip.store';
 
-function roomsLabel(stats: VibeStats | undefined): string {
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Riders currently waiting in rooms of this vibe, e.g. "3 riders". */
+function ridersLabel(stats: VibeStats | undefined): string {
   if (!stats) return '—';
-  if (stats.rooms === 0) return 'New room';
-  return `${stats.rooms} room${stats.rooms === 1 ? '' : 's'}`;
+  return stats.riders === 0 ? 'No one yet' : plural(stats.riders, 'rider');
 }
 
-function waitLabel(stats: VibeStats | undefined): string {
-  if (!stats || stats.rooms === 0) return 'Opens now';
-  return stats.openSeats > 0 ? 'Instant seat' : 'Opening a room';
+function seatsLabel(stats: VibeStats | undefined): string {
+  if (!stats || stats.rooms === 0) return 'Opens a new room';
+  return stats.openSeats > 0 ? plural(stats.openSeats, 'seat') + ' open' : 'Opens a new room';
+}
+
+/** What joining this vibe will do, so riders know before they enter. */
+function joinPreview(stats: VibeStats | undefined): string {
+  if (!stats || stats.riders === 0) return "No one is here yet — you'll start a new R.O.O.M. and others can join you.";
+  return `${plural(stats.riders, 'rider')} in ${plural(stats.rooms, 'room')} · ${seatsLabel(stats)}. You'll join the fullest room with a seat free.`;
 }
 
 export default function VibeSelectionScreen() {
@@ -129,12 +137,12 @@ export default function VibeSelectionScreen() {
                 </View>
                 <View style={styles.vibeTitleRow}>
                   <Text style={styles.vibeTitle}>{v.label}</Text>
-                  <Text style={[styles.vibeRooms, active && styles.vibeRoomsActive]}>{roomsLabel(s)}</Text>
+                  <Text style={[styles.vibeRooms, active && styles.vibeRoomsActive]}>{ridersLabel(s)}</Text>
                 </View>
                 <Text style={styles.vibeDescription}>{v.description}</Text>
                 <View style={styles.vibeFooter}>
                   <Text style={[styles.vibeTag, active && styles.vibeTagActive]}>{v.tag}</Text>
-                  <Text style={styles.vibeWait}>{waitLabel(s)}</Text>
+                  <Text style={styles.vibeWait}>{seatsLabel(s)}</Text>
                 </View>
               </Pressable>
             );
@@ -147,11 +155,10 @@ export default function VibeSelectionScreen() {
               <View style={styles.onlineDot} />
               <Text style={styles.selectionTitle}>Selected: {currentOption.label}</Text>
             </View>
-            <Text style={styles.selectionMeta}>{stats.get(current)?.riders ?? 0} riding now</Text>
+            <Text style={styles.selectionMeta}>{plural(stats.get(current)?.riders ?? 0, 'rider')} now</Text>
           </View>
-          <Text style={styles.selectionBody}>
-            Rolling R.O.O.M.s seat up to 10 verified riders and backfill as people reach their drop-off.
-          </Text>
+          <Text style={styles.selectionBody}>{joinPreview(stats.get(current))}</Text>
+          <Text style={styles.selectionNote}>Each R.O.O.M. seats up to 9 verified riders and backfills as people reach their drop-off.</Text>
         </Card>
 
         {!verified ? (
@@ -430,8 +437,14 @@ const styles = StyleSheet.create({
   },
   selectionBody: {
     ...textSize.xs,
+    fontFamily: fonts.sans.semibold,
+    color: colors.foreground,
+  },
+  selectionNote: {
+    ...textSize.xs,
     fontFamily: fonts.sans.regular,
     color: colors.mutedForeground,
+    marginTop: 4,
   },
   cta: {
     marginTop: 16,

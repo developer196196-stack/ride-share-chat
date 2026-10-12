@@ -1,7 +1,11 @@
-/** Sleek 1 — Splash Screen. Auto-advances to Onboarding #1. */
-import React, { useEffect } from 'react';
+/**
+ * Sleek 1 — Splash Screen. After a short delay it routes by state: first launch → intro,
+ * signed out → Sign-in, signed in → profile / permissions / Trip Validation (see lib/onboarding.ts).
+ */
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { getAuthMe } from '@workspace/api-client-react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, withAlpha } from '@/constants/colors';
@@ -10,16 +14,50 @@ import { images } from '@/constants/images';
 import { routes } from '@/constants/routes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { GlowBlob, LiveDot, Pulse, Screen } from '@/components/ui';
+import { getOnboardingFlags, routeForSignedInRider } from '@/lib/onboarding';
+import { useAuthStore } from '@/stores/auth.store';
 
 const AUTO_ADVANCE_MS = 3000;
 
 export default function SplashScreen() {
   const router = useRouter();
+  const isAuthReady = useAuthStore((s) => s.isAuthReady);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [delayDone, setDelayDone] = React.useState(false);
+  const navigated = useRef(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => router.replace(routes.welcome), AUTO_ADVANCE_MS);
+    const timer = setTimeout(() => setDelayDone(true), AUTO_ADVANCE_MS);
     return () => clearTimeout(timer);
-  }, [router]);
+  }, []);
+
+  const go = useCallback(async () => {
+    if (navigated.current) return;
+    navigated.current = true;
+    const flags = await getOnboardingFlags();
+    if (!isAuthenticated) {
+      router.replace(flags.introSeen ? routes.phoneAuth : routes.welcome);
+      return;
+    }
+    try {
+      const me = await getAuthMe();
+      router.replace(routeForSignedInRider(me.profileComplete, flags));
+    } catch (err) {
+      // Signed in with Firebase but the server rejects us (no rider record yet): finish sign-in.
+      const status = (err as { status?: number }).status;
+      if (status && status < 500) {
+        router.replace(routes.phoneAuth);
+        return;
+      }
+      // Offline or API down: trust what we know locally.
+      router.replace(flags.permissionsDone ? routes.validation : routes.permissions);
+    }
+  }, [isAuthenticated, router]);
+
+  // Wait for Firebase to restore the session so a signed-in rider never flashes the sign-in screen.
+  useEffect(() => {
+    if (delayDone && isAuthReady) void go();
+  }, [delayDone, isAuthReady, go]);
 
   return (
     <Screen
@@ -39,7 +77,7 @@ export default function SplashScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.center} onPress={() => router.replace(routes.welcome)}>
+      <Pressable style={styles.center} onPress={() => isAuthReady && void go()}>
         <View style={styles.logoWrap}>
           <GlowBlob color={colors.primary} opacity={0.2} size={380} style={styles.logoGlow} />
           <Image source={images.logoFull} style={styles.logo} contentFit="contain" />

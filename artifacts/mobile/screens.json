@@ -37,7 +37,7 @@
           "route": "/rider/onboarding/phone-auth",
           "file": "artifacts/mobile/app/rider/onboarding/phone-auth.tsx",
           "source": "sleek-temp-ref/4.-authentication-screen.tsx",
-          "description": "Step 1/4 (dynamic): Firebase phone OTP (country picker, SMS send via reCAPTCHA, 6-digit code with autofill, resend cooldown) → POST /v1/auth/bootstrap → SCR-ONB-05, or SCR-ONB-06 when the profile is already complete",
+          "description": "Step 1/3 (dynamic): Firebase phone OTP (country picker, SMS send via reCAPTCHA, 6-digit code with autofill, resend cooldown) → POST /v1/auth/bootstrap → SCR-ONB-05, or straight to Permissions / Trip Validation when the profile is already complete",
           "api": [
             "POST /v1/auth/bootstrap"
           ]
@@ -48,20 +48,12 @@
           "route": "/rider/onboarding/profile-setup",
           "file": "artifacts/mobile/app/rider/onboarding/profile-setup.tsx",
           "source": "sleek-temp-ref/5.-profile-setup-screen.tsx",
-          "description": "Step 2/4 (dynamic): GET /v1/auth/me prefill; display name / home city / ride style / incognito form (react-hook-form + zod); avatar upload via POST /v1/auth/me/photo-upload signed URL; save with PATCH /v1/auth/me",
+          "description": "Step 2/3 (dynamic): GET /v1/auth/me prefill; display name / home city / ride style / incognito form (react-hook-form + zod); avatar upload via POST /v1/auth/me/photo-upload signed URL; save with PATCH /v1/auth/me",
           "api": [
             "GET /v1/auth/me",
             "PATCH /v1/auth/me",
             "POST /v1/auth/me/photo-upload"
           ]
-        },
-        "SCR-ONB-06": {
-          "title": "Rideshare Connect",
-          "sleekNumber": 6,
-          "route": "/rider/onboarding/rideshare-connect",
-          "file": "artifacts/mobile/app/rider/onboarding/rideshare-connect.tsx",
-          "source": "sleek-temp-ref/6.-rideshare-connect-screen.tsx",
-          "description": "Step 3/4: platform picker (Uber, Lyft, Grab, Ola, Bolt, Other) — platform-agnostic, no API linking"
         },
         "SCR-ONB-07": {
           "title": "Permissions",
@@ -69,7 +61,7 @@
           "route": "/rider/onboarding/permissions",
           "file": "artifacts/mobile/app/rider/onboarding/permissions.tsx",
           "source": "sleek-temp-ref/7.-permissions-screen.tsx",
-          "description": "Step 4/4 (dynamic): requests camera+mic, GPS (required) and motion/activity permissions; shows live status"
+          "description": "Step 3/3 (dynamic): requests camera+mic, GPS (required) and motion/activity permissions; shows live status"
         }
       },
       "room-screens": {

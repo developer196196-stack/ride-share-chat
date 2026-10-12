@@ -1,6 +1,6 @@
 /**
  * Sleek 4 — Authentication Screen.
- * Firebase phone OTP → POST /v1/auth/bootstrap → Profile Setup (or Rideshare Connect when complete).
+ * Firebase phone OTP → POST /v1/auth/bootstrap → Profile Setup (or Permissions / Trip Validation when the profile is complete).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -26,6 +26,7 @@ import { fonts, textSize, tracking } from '@/constants/typography';
 import { FirebaseRecaptchaVerifier } from '@/components/firebase/FirebaseRecaptchaVerifier';
 import type { FirebaseRecaptchaVerifierHandle } from '@/components/firebase/firebase-recaptcha.types';
 import { Card, ErrorBanner, Icon, OptionSheet, Screen } from '@/components/ui';
+import { getOnboardingFlags, routeForSignedInRider } from '@/lib/onboarding';
 import { OtpInput, StepFooter, StepHeader, StepIntro } from '@/components/rideshare';
 import { mapFirebasePhoneAuthError, useFirebasePhoneAuth } from '@/hooks/use-firebase-phone-auth';
 import { getApiErrorMessage } from '@/lib/api/error-message';
@@ -74,7 +75,7 @@ export default function PhoneAuthScreen() {
   const finishSignIn = useCallback(async () => {
     const profile: RiderProfile = await bootstrap.mutateAsync({ data: { countryCode: country.iso } });
     queryClient.setQueryData(getGetAuthMeQueryKey(), profile);
-    router.replace(profile.profileComplete ? routes.rideshareConnect : routes.profileSetup);
+    router.replace(routeForSignedInRider(profile.profileComplete, await getOnboardingFlags()));
   }, [bootstrap, country.iso, queryClient, router]);
 
   const handleSend = useCallback(async () => {
