@@ -1,10 +1,10 @@
 ---
 name: Rideshare frontend framework
-description: Why frontend prototype requests should extend the current Rideshare Chats app
+description: Preserve the framework of the specific Rideshare artifact being changed
 ---
 
-When a prompt names Next.js while asking to add screens or behavior to Rideshare Chats, implement it in the existing React/Vite artifact unless the user explicitly requests a framework migration.
+Preserve the framework of the artifact the user is changing rather than migrating it because an example prompt names another framework. The earlier React/Vite decision applies to the legacy web rider prototype, not to the newer Expo app imported from main.
 
 **Why:** The product already has a routed, previewable React application with approved screen designs. Replacing the framework just to add an isolated state-machine prototype would duplicate the app and risk breaking established screens.
 
-**How to apply:** Keep the existing app and routing for additions; explain the adaptation plainly. If the user explicitly wants a Next.js conversion, scope that as a separate migration rather than assuming compatibility.
+**How to apply:** Determine which app the user means before adding screens. Keep its existing routing and framework. Do not translate Expo requests into the legacy web app or replace the old web preview when showing the newer mobile artifact. Scope explicit framework conversions separately.

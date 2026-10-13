@@ -1,2 +1,3 @@
-- [Rideshare frontend framework](rideshare-frontend-framework.md) — integrate prototype prompts into the existing React/Vite app unless migration is explicitly requested.
+- [Rideshare frontend framework](rideshare-frontend-framework.md) — preserve the targeted app's framework; the legacy web prototype and imported Expo app are separate.
 - [Workspace test tooling installs](workspace-test-tooling.md) — package installer cannot pass pnpm workspace-root flags; use an explicit root-scoped install for shared test tools.
+- [Expo patch validation](expo-patch-validation.md) — validation can recommend patches too new for the security window; respect the policy and verify the actual preview.
