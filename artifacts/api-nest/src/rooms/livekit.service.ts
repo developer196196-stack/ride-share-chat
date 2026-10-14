@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk';
 import { loadAppConfig } from '../config/configuration';
 
 export type LiveKitConnection = { url: string; token: string };
 
-/** Issues R.O.O.M. video passes and removes participants (ended / terminated sessions). */
+/** Issues R.O.O.M. video passes, removes participants and applies host moderation. */
 @Injectable()
 export class LiveKitService {
   private readonly logger = new Logger(LiveKitService.name);
@@ -46,6 +46,24 @@ export class LiveKitService {
       canPublishData: false,
     });
     return { url: LIVEKIT_URL!, token: await token.toJwt() };
+  }
+
+  /**
+   * Host force-mute: mutes the rider's published microphone on the server, so it holds even if
+   * the app ignores the FORCE_MUTED notice. Best effort — they may not be publishing audio.
+   */
+  async muteMicrophone(roomId: string, uid: string): Promise<boolean> {
+    if (!this.rooms) return false;
+    try {
+      const participant = await this.rooms.getParticipant(roomId, uid);
+      const mic = participant.tracks.find((t) => t.source === TrackSource.MICROPHONE);
+      if (!mic) return false;
+      await this.rooms.mutePublishedTrack(roomId, uid, mic.sid, true);
+      return true;
+    } catch (error) {
+      this.logger.debug(`mutePublishedTrack(${roomId}, ${uid}) skipped: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
   }
 
   /** Best effort — the participant may already have disconnected. */

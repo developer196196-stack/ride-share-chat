@@ -12,12 +12,12 @@ import { routes } from '@/constants/routes';
 type Tab = 'home' | 'history' | 'settings';
 
 const TABS: { key: Tab; label: string; icon: IconName; activeIcon: IconName; href: string }[] = [
-  { key: 'home', label: 'Home', icon: 'solarHomeSmileBold', activeIcon: 'solarHomeSmileBold', href: routes.vibeSelection },
+  { key: 'home', label: 'Home', icon: 'solarHomeSmileBold', activeIcon: 'solarHomeSmileBold', href: routes.discover },
   { key: 'history', label: 'History', icon: 'solarHistoryLinear', activeIcon: 'solarHistoryLinear', href: routes.connections },
   { key: 'settings', label: 'Settings', icon: 'solarSettingsLinear', activeIcon: 'solarSettingsLinear', href: routes.settings },
 ];
 
-/** Fixed bottom nav from the Vibe Selection screen (Home · History · Settings). */
+/** Fixed bottom nav (Home = Discovery Grid · History · Settings). */
 export function BottomTabBar({ active }: { active: Tab }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();

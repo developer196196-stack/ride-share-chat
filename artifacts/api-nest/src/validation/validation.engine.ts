@@ -4,7 +4,9 @@
  * Three modules are scored 0–100 and combined with the configured weights:
  *   Module 1 GPS (40%) · Module 2 micro-vibration (25%) · Module 3 ground truth (35%).
  * A module with no data counts as a neutral 50, so a rider can never reach VERIFIED
- * on GPS alone. States: PENDING → VERIFIED ⇄ GRACE → TERMINATED.
+ * on GPS alone. States: PENDING → VERIFIED ⇄ GRACE → POST_RIDE → TERMINATED.
+ * POST_RIDE is the post-ride extension: after the rider leaves the vehicle the session stays
+ * live for a few minutes (default 3), then ends.
  */
 import { ValidationConfig as C, MPS_TO_MPH } from './validation.config';
 import type {
@@ -47,6 +49,7 @@ export function createInitialState(now: number): EngineState {
     lastMovingAt: null,
     graceDeadline: null,
     graceStartedAt: null,
+    postRideDeadline: null,
     verifiedAt: null,
     lastFix: null,
     recentFixes: [],
@@ -121,11 +124,10 @@ export type ReduceResult = {
   previousState: ValidationState;
 };
 
-function terminate(state: EngineState, reason: TerminationReason, now: number): EngineState {
+/** Closes an open grace period and adds its length to the ride stats. */
+function closeGrace(state: EngineState, now: number): EngineState {
   return {
     ...state,
-    state: 'TERMINATED',
-    terminationReason: reason,
     graceDeadline: null,
     stats:
       state.state === 'GRACE' && state.graceStartedAt
@@ -134,6 +136,19 @@ function terminate(state: EngineState, reason: TerminationReason, now: number): 
     graceStartedAt: null,
   };
 }
+
+function terminate(state: EngineState, reason: TerminationReason, now: number): EngineState {
+  return { ...closeGrace(state, now), state: 'TERMINATED', terminationReason: reason, postRideDeadline: null };
+}
+
+/** Rider left the vehicle: start the post-ride extension, or end at once when it is disabled. */
+function exitVehicle(state: EngineState, now: number): EngineState {
+  if (C.postRideMs <= 0) return terminate(state, 'exited_vehicle', now);
+  return { ...closeGrace(state, now), state: 'POST_RIDE', postRideDeadline: now + C.postRideMs };
+}
+
+const postRideOver = (s: EngineState, now: number) =>
+  s.state === 'POST_RIDE' && s.postRideDeadline != null && now >= s.postRideDeadline;
 
 /**
  * Applies one telemetry sample. `now` is server time. Modules missing from the sample keep
@@ -152,7 +167,8 @@ export function reduceSample(
 
   // ---- Module 1: GPS ------------------------------------------------------
   let spoof = false;
-  const fix = sample.gps;
+  // Low-power positions are too coarse for speed or teleport checks; the service still stores them as the live location.
+  const fix = sample.gps && !sample.gps.lowPower ? sample.gps : undefined;
   if (fix) {
     if (fix.isMock && !devBypass) spoof = true;
     const prevFix = prev.lastFix;
@@ -223,7 +239,14 @@ export function reduceSample(
     if (spoof) {
       s = terminate(s, 'spoof_detected', now);
     } else if (exited && (s.state === 'VERIFIED' || s.state === 'GRACE')) {
-      s = terminate(s, 'exited_vehicle', now);
+      s = exitVehicle(s, now);
+    } else if (s.state === 'POST_RIDE') {
+      if (postRideOver(s, now)) {
+        s = terminate(s, 'exited_vehicle', now);
+      } else if (!walking && sustainedEntry && s.score >= C.bands.verified) {
+        // Back in a moving vehicle (or the walking signal was a false alarm).
+        s = { ...s, state: 'VERIFIED', postRideDeadline: null };
+      }
     } else if (s.state === 'PENDING') {
       if (sustainedEntry && s.score >= C.bands.verified) {
         s.state = 'VERIFIED';
@@ -258,6 +281,8 @@ export function sweepState(prev: EngineState, now: number): ReduceResult {
   let s = prev;
   if (prev.state === 'GRACE' && prev.graceDeadline != null && now >= prev.graceDeadline) {
     s = terminate({ ...prev, updatedAt: now }, 'grace_expired', now);
+  } else if (postRideOver(prev, now)) {
+    s = terminate({ ...prev, updatedAt: now }, 'exited_vehicle', now);
   } else if (
     prev.state === 'VERIFIED' &&
     prev.lastSampleAt != null &&
@@ -293,7 +318,9 @@ export function needsRoadCheck(state: EngineState, now: number): boolean {
 }
 
 export function toSnapshot(s: EngineState, now: number): ValidationSnapshot {
-  const remaining = s.graceDeadline != null ? Math.max(0, Math.ceil((s.graceDeadline - now) / 1000)) : null;
+  const secondsUntil = (deadline: number | null | undefined) =>
+    deadline != null ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+  const postRideDeadline = s.postRideDeadline ?? null;
   return {
     state: s.state,
     score: s.score,
@@ -306,13 +333,16 @@ export function toSnapshot(s: EngineState, now: number): ValidationSnapshot {
       onRoad: s.roadCheck ? s.roadCheck.onRoad : null,
     },
     graceDeadline: s.graceDeadline != null ? new Date(s.graceDeadline).toISOString() : null,
-    graceRemainingSec: remaining,
+    graceRemainingSec: secondsUntil(s.graceDeadline),
+    postRideDeadline: postRideDeadline != null ? new Date(postRideDeadline).toISOString() : null,
+    postRideRemainingSec: secondsUntil(postRideDeadline),
     terminationReason: s.terminationReason,
     thresholds: {
       entryMph: C.speed.entryMph,
       entrySustainSec: Math.round(C.speed.entrySustainMs / 1000),
       graceMph: C.speed.graceMph,
       graceDurationSec: Math.round(C.graceDurationMs / 1000),
+      postRideDurationSec: Math.round(C.postRideMs / 1000),
       verifiedScore: C.bands.verified,
     },
     updatedAt: new Date(s.updatedAt).toISOString(),

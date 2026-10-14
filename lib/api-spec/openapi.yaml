@@ -297,6 +297,104 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/discover:
+    get:
+      operationId: listDiscoverRooms
+      tags: [rooms]
+      summary: Discovery Grid — up to 9 live R.O.O.M.s with open seats
+      description: |
+        Live rooms across all moods, fullest first, each with its host preview and occupancy.
+        Skips the rider's own room and rooms with someone they skipped in the last 60 minutes.
+        Listing works before verification; joining needs VERIFIED.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Live rooms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/host:
+    post:
+      operationId: hostRoom
+      tags: [rooms]
+      summary: Host a Room — open a new R.O.O.M. with the rider as moderator
+      description: |
+        Requires VERIFIED. Leaves the rider's current room (if any) and opens a new public room for
+        the mood; matchmaking fills the other 8 seats.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostRoomRequest"
+      responses:
+        "200":
+          description: Room session (the rider is the host)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: >-
+            `NOT_VERIFIED` (trip not verified), `ROOM_FULL`, `ROOM_UNAVAILABLE` (closed, or someone you
+            skipped in the last 60 minutes is in it) or `MATCHMAKER_BUSY`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/{roomId}/join:
+    post:
+      operationId: joinRoomById
+      tags: [rooms]
+      summary: Join a specific R.O.O.M. from the Discovery Grid
+      description: Requires VERIFIED. Leaves the rider's current room (if any) first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Room session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No such room (code `ROOM_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: >-
+            `NOT_VERIFIED` (trip not verified), `ROOM_FULL`, `ROOM_UNAVAILABLE` (closed, or someone you
+            skipped in the last 60 minutes is in it) or `MATCHMAKER_BUSY`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /v1/rooms/next:
     post:
       operationId: nextRoom
@@ -340,6 +438,506 @@ paths:
                 $ref: "#/components/schemas/RideSummary"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/settings:
+    patch:
+      operationId: updateRoomSettings
+      tags: [rooms]
+      summary: Host controls — mood shift, automatic/manual matching, privacy lock
+      description: |
+        Host only. A new mood moves the room to that mood's matchmaking pool. The room is public
+        (on the Discovery Grid and open to matchmaking) only while matching is `auto` and it is not
+        locked. Everyone in the room gets `ROOM_SETTINGS_CHANGED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomSettingsUpdate"
+      responses:
+        "200":
+          description: Updated room session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room's host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/members/{uid}/eject:
+    post:
+      operationId: ejectMember
+      tags: [rooms]
+      summary: Host — eject a rider
+      description: Removes the rider from the room and video, and keeps them out of this room for the rest of its life (also through matchmaking). Their ride continues. They get `ROOM_EJECTED`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room's host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: That rider isn't in your room (code `MEMBER_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/members/{uid}/mute:
+    post:
+      operationId: muteMember
+      tags: [rooms]
+      summary: Host — force-mute a rider
+      description: Mutes the rider’s microphone on the video server and sends them `FORCE_MUTED` ("The Host has muted your microphone."). They can unmute themselves later.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room's host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: That rider isn't in your room (code `MEMBER_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/members/{uid}/flag:
+    post:
+      operationId: flagMember
+      tags: [rooms]
+      summary: Host — silently flag a rider for Trust & Safety
+      description: Creates a moderation report (source `host_flag`) with recent room chat. Invisible to the flagged rider; the room carries on.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagRequest"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room's host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: That rider isn't in your room (code `MEMBER_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/users/{uid}:
+    get:
+      operationId: getUserProfile
+      tags: [social]
+      summary: Public profile with follow counts and your relationship
+      description: Live room status is only included for friends (you follow each other).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No such rider (code `USER_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/users/{uid}/follow:
+    post:
+      operationId: followUser
+      tags: [social]
+      summary: Follow a rider
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No such rider (code `USER_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: You cannot follow yourself (code `CANNOT_FOLLOW_SELF`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    delete:
+      operationId: unfollowUser
+      tags: [social]
+      summary: Unfollow a rider
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/me/following:
+    get:
+      operationId: listFollowing
+      tags: [social]
+      summary: Riders you follow (friends who are riding now first)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/me/followers:
+    get:
+      operationId: listFollowers
+      tags: [social]
+      summary: Riders who follow you
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/invites:
+    post:
+      operationId: inviteToRoom
+      tags: [social]
+      summary: Host — invite someone from your network into your room
+      description: |
+        The invitee must follow you or be followed by you. They get `ROOM_INVITE`; the invite lasts
+        10 minutes and lets them into the room even while it is Manual or locked (never past an
+        ejection or a recent skip).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room’s host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such rider, or not in your network (code `NOT_IN_NETWORK`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/{roomId}/requests:
+    post:
+      operationId: requestToJoinRoom
+      tags: [social]
+      summary: Ask a friend's private room for a seat
+      description: Only for friends of the host (you follow each other) and only while the room is private. The host gets `ROOM_JOIN_REQUEST`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only friends of the host can ask (code `NOT_FRIENDS`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such room (code `ROOM_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`ROOM_PUBLIC` (just join it), `ROOM_FULL`, `ROOM_UNAVAILABLE` or `NOT_VERIFIED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/requests:
+    get:
+      operationId: listJoinRequests
+      tags: [social]
+      summary: Host — pending join requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinRequestList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room’s host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/requests/{uid}/accept:
+    post:
+      operationId: acceptJoinRequest
+      tags: [social]
+      summary: Host — accept a join request (sends the rider an invite)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room’s host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such request (code `REQUEST_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/current/requests/{uid}/decline:
+    post:
+      operationId: declineJoinRequest
+      tags: [social]
+      summary: Host — decline a join request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the room’s host can do this (code `NOT_HOST`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not in a R.O.O.M. (code `NOT_IN_ROOM`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
   /v1/rooms/current/messages:
@@ -764,7 +1362,8 @@ components:
         - expiresAt
     ValidationState:
       type: string
-      enum: [PENDING, VERIFIED, GRACE, TERMINATED]
+      description: POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.
+      enum: [PENDING, VERIFIED, GRACE, POST_RIDE, TERMINATED]
     ActivityType:
       type: string
       enum: [in_vehicle, on_bicycle, on_foot, walking, running, still, unknown]
@@ -791,6 +1390,11 @@ components:
           description: Fix time, ms since epoch
         isMock:
           type: boolean
+        lowPower:
+          type: boolean
+          description: >-
+            Low-power network position sent while the app's battery saver is on. Used for the
+            rider's live location only, never for speed or spoof checks.
       required: [lat, lng, speedMps, accuracyM, timestamp, isMock]
     VibrationReading:
       type: object
@@ -889,6 +1493,12 @@ components:
           format: date-time
         graceRemainingSec:
           type: ["number", "null"]
+        postRideDeadline:
+          type: ["string", "null"]
+          format: date-time
+          description: End of the post-ride extension (POST_RIDE only)
+        postRideRemainingSec:
+          type: ["number", "null"]
         terminationReason:
           type: ["string", "null"]
           enum: [spoof_detected, exited_vehicle, grace_expired, signal_lost, user_ended, null]
@@ -904,13 +1514,15 @@ components:
               type: number
             graceDurationSec:
               type: number
+            postRideDurationSec:
+              type: number
             verifiedScore:
               type: number
-          required: [entryMph, entrySustainSec, graceMph, graceDurationSec, verifiedScore]
+          required: [entryMph, entrySustainSec, graceMph, graceDurationSec, postRideDurationSec, verifiedScore]
         updatedAt:
           type: string
           format: date-time
-      required: [state, score, speedMph, modules, checks, graceDeadline, graceRemainingSec, terminationReason, thresholds, updatedAt]
+      required: [state, score, speedMph, modules, checks, graceDeadline, graceRemainingSec, postRideDeadline, postRideRemainingSec, terminationReason, thresholds, updatedAt]
     Vibe:
       type: string
       enum: [party_mode, networking, deep_talks, just_chilling]
@@ -945,7 +1557,10 @@ components:
           type: ["string", "null"]
         isSelf:
           type: boolean
-      required: [uid, displayName, homeCity, photoUrl, isSelf]
+        isHost:
+          type: boolean
+          description: The room's moderator
+      required: [uid, displayName, homeCity, photoUrl, isSelf, isHost]
     LiveKitConnection:
       type: object
       properties:
@@ -963,6 +1578,14 @@ components:
           $ref: "#/components/schemas/Vibe"
         capacity:
           type: number
+        hostUid:
+          type: ["string", "null"]
+          description: The room's moderator (opened the room, or the longest-present rider after the host left)
+        matching:
+          $ref: "#/components/schemas/RoomMatching"
+        locked:
+          type: boolean
+          description: Privacy Lock — closed to new riders until the host unlocks it
         members:
           type: array
           items:
@@ -975,7 +1598,171 @@ components:
         joinedAt:
           type: string
           format: date-time
-      required: [roomId, vibe, capacity, members, livekit, joinedAt]
+      required: [roomId, vibe, capacity, hostUid, matching, locked, members, livekit, joinedAt]
+    RoomMatching:
+      type: string
+      description: auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)
+      enum: [auto, manual]
+    RoomSettingsUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+        matching:
+          $ref: "#/components/schemas/RoomMatching"
+        locked:
+          type: boolean
+    ModerationResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+    FlagRequest:
+      type: object
+      properties:
+        note:
+          type: ["string", "null"]
+          maxLength: 500
+    LiveRoom:
+      type: object
+      description: Where a friend is riding right now
+      properties:
+        roomId:
+          type: string
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+        isHost:
+          type: boolean
+        memberCount:
+          type: number
+        capacity:
+          type: number
+        open:
+          type: boolean
+          description: Public with a free seat (join directly); otherwise ask the host
+      required: [roomId, vibe, isHost, memberCount, capacity, open]
+    SocialUser:
+      type: object
+      properties:
+        uid:
+          type: string
+        displayName:
+          type: string
+        homeCity:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        isFollowing:
+          type: boolean
+        followsYou:
+          type: boolean
+        live:
+          description: Only for friends (mutual follows) who are in a R.O.O.M. right now
+          oneOf:
+            - $ref: "#/components/schemas/LiveRoom"
+            - type: "null"
+      required: [uid, displayName, homeCity, photoUrl, isFollowing, followsYou, live]
+    SocialList:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialUser"
+      required: [users]
+    PublicProfile:
+      allOf:
+        - $ref: "#/components/schemas/SocialUser"
+        - type: object
+          properties:
+            followerCount:
+              type: number
+            followingCount:
+              type: number
+          required: [followerCount, followingCount]
+    FollowResult:
+      type: object
+      properties:
+        following:
+          type: boolean
+        followerCount:
+          type: number
+      required: [following, followerCount]
+    InviteRequest:
+      type: object
+      properties:
+        uid:
+          type: string
+          minLength: 1
+      required: [uid]
+    JoinRequest:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/RoomHost"
+        requestedAt:
+          type: string
+          format: date-time
+      required: [user, requestedAt]
+    JoinRequestList:
+      type: object
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/JoinRequest"
+      required: [requests]
+    HostRoomRequest:
+      type: object
+      properties:
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+      required: [vibe]
+    RoomHost:
+      type: object
+      properties:
+        uid:
+          type: string
+        displayName:
+          type: string
+        homeCity:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+      required: [uid, displayName, homeCity, photoUrl]
+    DiscoverRoom:
+      type: object
+      properties:
+        roomId:
+          type: string
+        vibe:
+          $ref: "#/components/schemas/Vibe"
+        memberCount:
+          type: number
+        capacity:
+          type: number
+        host:
+          oneOf:
+            - $ref: "#/components/schemas/RoomHost"
+            - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+      required: [roomId, vibe, memberCount, capacity, host, createdAt]
+    DiscoverResponse:
+      type: object
+      properties:
+        rooms:
+          type: array
+          maxItems: 9
+          items:
+            $ref: "#/components/schemas/DiscoverRoom"
+        liveRooms:
+          type: number
+          description: All live rooms right now (including full ones)
+      required: [rooms, liveRooms]
     CurrentRoomResponse:
       type: object
       properties:

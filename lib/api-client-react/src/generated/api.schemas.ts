@@ -116,6 +116,9 @@ export interface ProfilePhotoUpload {
   expiresAt: string;
 }
 
+/**
+ * POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.
+ */
 export type ValidationState = typeof ValidationState[keyof typeof ValidationState];
 
 
@@ -123,6 +126,7 @@ export const ValidationState = {
   PENDING: 'PENDING',
   VERIFIED: 'VERIFIED',
   GRACE: 'GRACE',
+  POST_RIDE: 'POST_RIDE',
   TERMINATED: 'TERMINATED',
 } as const;
 
@@ -163,6 +167,8 @@ export interface GpsReading {
   /** Fix time, ms since epoch */
   timestamp: number;
   isMock: boolean;
+  /** Low-power network position sent while the app's battery saver is on. Used for the rider's live location only, never for speed or spoof checks. */
+  lowPower?: boolean;
 }
 
 /**
@@ -261,6 +267,7 @@ export type ValidationSnapshotThresholds = {
   entrySustainSec: number;
   graceMph: number;
   graceDurationSec: number;
+  postRideDurationSec: number;
   verifiedScore: number;
 };
 
@@ -274,6 +281,13 @@ export interface ValidationSnapshot {
   graceDeadline: string | null;
   /** @nullable */
   graceRemainingSec: number | null;
+  /**
+     * End of the post-ride extension (POST_RIDE only)
+     * @nullable
+     */
+  postRideDeadline: string | null;
+  /** @nullable */
+  postRideRemainingSec: number | null;
   /** @nullable */
   terminationReason: ValidationSnapshotTerminationReason;
   /** Active engine thresholds (configurable on the server via VALIDATION_* env) */
@@ -310,6 +324,8 @@ export interface RoomMember {
   /** @nullable */
   photoUrl: string | null;
   isSelf: boolean;
+  /** The room's moderator */
+  isHost: boolean;
 }
 
 export interface LiveKitConnection {
@@ -317,14 +333,134 @@ export interface LiveKitConnection {
   token: string;
 }
 
+/**
+ * auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)
+ */
+export type RoomMatching = typeof RoomMatching[keyof typeof RoomMatching];
+
+
+export const RoomMatching = {
+  auto: 'auto',
+  manual: 'manual',
+} as const;
+
 export interface RoomSession {
   roomId: string;
   vibe: Vibe;
   capacity: number;
+  /**
+     * The room's moderator (opened the room, or the longest-present rider after the host left)
+     * @nullable
+     */
+  hostUid: string | null;
+  matching: RoomMatching;
+  /** Privacy Lock — closed to new riders until the host unlocks it */
+  locked: boolean;
   members: RoomMember[];
   /** Null when video is not configured on the server */
   livekit: LiveKitConnection | null;
   joinedAt: string;
+}
+
+export interface RoomSettingsUpdate {
+  vibe?: Vibe;
+  matching?: RoomMatching;
+  locked?: boolean;
+}
+
+export interface ModerationResult {
+  ok: boolean;
+}
+
+export interface FlagRequest {
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note?: string | null;
+}
+
+/**
+ * Where a friend is riding right now
+ */
+export interface LiveRoom {
+  roomId: string;
+  vibe: Vibe;
+  isHost: boolean;
+  memberCount: number;
+  capacity: number;
+  /** Public with a free seat (join directly); otherwise ask the host */
+  open: boolean;
+}
+
+export interface SocialUser {
+  uid: string;
+  displayName: string;
+  /** @nullable */
+  homeCity: string | null;
+  /** @nullable */
+  photoUrl: string | null;
+  isFollowing: boolean;
+  followsYou: boolean;
+  /** Only for friends (mutual follows) who are in a R.O.O.M. right now */
+  live: LiveRoom | null;
+}
+
+export interface SocialList {
+  users: SocialUser[];
+}
+
+export type PublicProfile = SocialUser & {
+  followerCount: number;
+  followingCount: number;
+};
+
+export interface FollowResult {
+  following: boolean;
+  followerCount: number;
+}
+
+export interface InviteRequest {
+  /** @minLength 1 */
+  uid: string;
+}
+
+export interface RoomHost {
+  uid: string;
+  displayName: string;
+  /** @nullable */
+  homeCity: string | null;
+  /** @nullable */
+  photoUrl: string | null;
+}
+
+export interface JoinRequest {
+  user: RoomHost;
+  requestedAt: string;
+}
+
+export interface JoinRequestList {
+  requests: JoinRequest[];
+}
+
+export interface HostRoomRequest {
+  vibe: Vibe;
+}
+
+export interface DiscoverRoom {
+  roomId: string;
+  vibe: Vibe;
+  memberCount: number;
+  capacity: number;
+  host: RoomHost | null;
+  createdAt: string;
+}
+
+export interface DiscoverResponse {
+  /** @maxItems 9 */
+  rooms: DiscoverRoom[];
+  /** All live rooms right now (including full ones) */
+  liveRooms: number;
 }
 
 export interface CurrentRoomResponse {

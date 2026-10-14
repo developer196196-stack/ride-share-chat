@@ -136,13 +136,59 @@ describe('Trip Validation Engine', () => {
     assert.equal(s.terminationReason, 'grace_expired');
   });
 
-  it('terminates when the rider gets out and walks', () => {
+  const walkingSample = (tt: number) => sample(tt, 3, { walking: 0.85, activity: { type: 'walking', confidence: 85 } });
+
+  it('keeps the session live for the 3-minute post-ride extension after the rider walks away', () => {
     let { s, t } = verified();
-    s = drive(s, t + 2_000, t + 30_000, 2_000, (tt) =>
-      sample(tt, 3, { walking: 0.85, activity: { type: 'walking', confidence: 85 } }),
-    );
+    s = drive(s, t + 2_000, t + 30_000, 2_000, walkingSample);
+    assert.equal(s.state, 'POST_RIDE');
+    assert.ok(s.postRideDeadline);
+    s = drive(s, t + 32_000, t + 2 * 60_000, 10_000, walkingSample);
+    assert.equal(s.state, 'POST_RIDE', 'still live 2 minutes after leaving the car');
+    s = drive(s, t + 2 * 60_000 + 10_000, t + 4 * 60_000, 10_000, walkingSample);
     assert.equal(s.state, 'TERMINATED');
     assert.equal(s.terminationReason, 'exited_vehicle');
+    assert.equal(s.postRideDeadline, null);
+  });
+
+  it('ends the post-ride extension even when telemetry stops', () => {
+    let { s, t } = verified();
+    s = drive(s, t + 2_000, t + 30_000, 2_000, walkingSample);
+    assert.equal(s.state, 'POST_RIDE');
+    const deadline = s.postRideDeadline!;
+    assert.equal(sweepState(s, deadline - 1_000).next.state, 'POST_RIDE');
+    const ended = sweepState(s, deadline + 1).next;
+    assert.equal(ended.state, 'TERMINATED');
+    assert.equal(ended.terminationReason, 'exited_vehicle');
+  });
+
+  it('returns to VERIFIED if the rider is back in a moving vehicle during the extension', () => {
+    let { s, t } = verified();
+    s = drive(s, t + 2_000, t + 30_000, 2_000, walkingSample);
+    assert.equal(s.state, 'POST_RIDE');
+    s = drive(s, t + 32_000, t + 60_000, 2_000, (tt) => sample(tt, 25, { activity: inVehicle }));
+    assert.equal(s.state, 'VERIFIED');
+    assert.equal(s.postRideDeadline, null);
+  });
+
+  it('ends at once on exit when the post-ride extension is disabled', () => {
+    setValidationConfigForTests({ VALIDATION_POST_RIDE_SEC: '0' });
+    let { s, t } = verified();
+    s = drive(s, t + 2_000, t + 30_000, 2_000, walkingSample);
+    assert.equal(s.state, 'TERMINATED');
+    assert.equal(s.terminationReason, 'exited_vehicle');
+  });
+
+  it('ignores low-power (battery saver) positions for speed', () => {
+    let { s, t } = verified();
+    const speedBefore = s.speedMps;
+    // Coarse network fixes reporting 0 mph for 30 s must not start a grace period.
+    s = drive(s, t + 2_000, t + 30_000, 2_000, (tt) => {
+      const coarse = sample(tt, 0, { vib: null, activity: inVehicle });
+      return { ...coarse, gps: { ...coarse.gps!, accuracyM: 30, lowPower: true } };
+    });
+    assert.equal(s.state, 'VERIFIED');
+    assert.equal(s.speedMps, speedBefore);
   });
 
   it('does not verify a train (fast, vibrating, but not on a road)', () => {

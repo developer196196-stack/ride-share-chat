@@ -26,24 +26,34 @@ import type {
   AuthBootstrapRequest,
   ChatMessage,
   CurrentRoomResponse,
+  DiscoverResponse,
   ErrorResponse,
   FirebaseUnavailableResponse,
+  FlagRequest,
+  FollowResult,
   HealthStatus,
+  HostRoomRequest,
+  InviteRequest,
+  JoinRequestList,
   JoinRoomRequest,
+  ModerationResult,
   Preferences,
   ProfilePhotoUpload,
   ProfilePhotoUploadRequest,
+  PublicProfile,
   PublicShareStatus,
   ReportRequest,
   ReportResult,
   RideSummary,
   RiderProfile,
   RoomSession,
+  RoomSettingsUpdate,
   SafetyAlertRequest,
   SafetyAlertResult,
   ServiceUnavailableResponse,
   ShareLink,
   ShareLinkRequest,
+  SocialList,
   TelemetrySample,
   TrustedContact,
   TrustedContactInput,
@@ -909,6 +919,231 @@ export const useJoinRoom = <TError = ErrorType<UnauthorizedResponse | ErrorRespo
       return useMutation(getJoinRoomMutationOptions(options));
     }
 
+export const getListDiscoverRoomsUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/discover`
+}
+
+/**
+ * Live rooms across all moods, fullest first, each with its host preview and occupancy.
+ * Skips the rider's own room and rooms with someone they skipped in the last 60 minutes.
+ * Listing works before verification; joining needs VERIFIED.
+ * @summary Discovery Grid — up to 9 live R.O.O.M.s with open seats
+ */
+export const listDiscoverRooms = async ( options?: RequestInit): Promise<DiscoverResponse> => {
+
+  return customFetch<DiscoverResponse>(getListDiscoverRoomsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDiscoverRoomsQueryKey = () => {
+    return [
+    `/api/v1/rooms/discover`
+    ] as const;
+    }
+
+
+export const getListDiscoverRoomsQueryOptions = <TData = Awaited<ReturnType<typeof listDiscoverRooms>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDiscoverRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDiscoverRoomsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDiscoverRooms>>> = ({ signal }) => listDiscoverRooms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDiscoverRooms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDiscoverRoomsQueryResult = NonNullable<Awaited<ReturnType<typeof listDiscoverRooms>>>
+export type ListDiscoverRoomsQueryError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>
+
+
+/**
+ * @summary Discovery Grid — up to 9 live R.O.O.M.s with open seats
+ */
+
+export function useListDiscoverRooms<TData = Awaited<ReturnType<typeof listDiscoverRooms>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDiscoverRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDiscoverRoomsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getHostRoomUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/host`
+}
+
+/**
+ * Requires VERIFIED. Leaves the rider's current room (if any) and opens a new public room for
+ * the mood; matchmaking fills the other 8 seats.
+ * @summary Host a Room — open a new R.O.O.M. with the rider as moderator
+ */
+export const hostRoom = async (hostRoomRequest: HostRoomRequest, options?: RequestInit): Promise<RoomSession> => {
+
+  return customFetch<RoomSession>(getHostRoomUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(hostRoomRequest)
+  }
+);}
+
+
+
+
+
+export const getHostRoomMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof hostRoom>>, TError,{data: BodyType<HostRoomRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof hostRoom>>, TError,{data: BodyType<HostRoomRequest>}, TContext> => {
+
+const mutationKey = ['hostRoom'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof hostRoom>>, {data: BodyType<HostRoomRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  hostRoom(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HostRoomMutationResult = NonNullable<Awaited<ReturnType<typeof hostRoom>>>
+    export type HostRoomMutationBody = BodyType<HostRoomRequest>
+    export type HostRoomMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host a Room — open a new R.O.O.M. with the rider as moderator
+ */
+export const useHostRoom = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof hostRoom>>, TError,{data: BodyType<HostRoomRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof hostRoom>>,
+        TError,
+        {data: BodyType<HostRoomRequest>},
+        TContext
+      > => {
+      return useMutation(getHostRoomMutationOptions(options));
+    }
+
+export const getJoinRoomByIdUrl = (roomId: string,) => {
+
+
+
+
+  return `/api/v1/rooms/${roomId}/join`
+}
+
+/**
+ * Requires VERIFIED. Leaves the rider's current room (if any) first.
+ * @summary Join a specific R.O.O.M. from the Discovery Grid
+ */
+export const joinRoomById = async (roomId: string, options?: RequestInit): Promise<RoomSession> => {
+
+  return customFetch<RoomSession>(getJoinRoomByIdUrl(roomId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getJoinRoomByIdMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinRoomById>>, TError,{roomId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinRoomById>>, TError,{roomId: string}, TContext> => {
+
+const mutationKey = ['joinRoomById'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinRoomById>>, {roomId: string}> = (props) => {
+          const {roomId} = props ?? {};
+
+          return  joinRoomById(roomId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinRoomByIdMutationResult = NonNullable<Awaited<ReturnType<typeof joinRoomById>>>
+
+    export type JoinRoomByIdMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Join a specific R.O.O.M. from the Discovery Grid
+ */
+export const useJoinRoomById = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinRoomById>>, TError,{roomId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinRoomById>>,
+        TError,
+        {roomId: string},
+        TContext
+      > => {
+      return useMutation(getJoinRoomByIdMutationOptions(options));
+    }
+
 export const getNextRoomUrl = () => {
 
 
@@ -1051,6 +1286,1036 @@ export const useLeaveRoom = <TError = ErrorType<UnauthorizedResponse | ServiceUn
         TContext
       > => {
       return useMutation(getLeaveRoomMutationOptions(options));
+    }
+
+export const getUpdateRoomSettingsUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/current/settings`
+}
+
+/**
+ * Host only. A new mood moves the room to that mood's matchmaking pool. The room is public
+ * (on the Discovery Grid and open to matchmaking) only while matching is `auto` and it is not
+ * locked. Everyone in the room gets `ROOM_SETTINGS_CHANGED`.
+ * @summary Host controls — mood shift, automatic/manual matching, privacy lock
+ */
+export const updateRoomSettings = async (roomSettingsUpdate: RoomSettingsUpdate, options?: RequestInit): Promise<RoomSession> => {
+
+  return customFetch<RoomSession>(getUpdateRoomSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(roomSettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateRoomSettingsMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoomSettings>>, TError,{data: BodyType<RoomSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRoomSettings>>, TError,{data: BodyType<RoomSettingsUpdate>}, TContext> => {
+
+const mutationKey = ['updateRoomSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRoomSettings>>, {data: BodyType<RoomSettingsUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateRoomSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRoomSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateRoomSettings>>>
+    export type UpdateRoomSettingsMutationBody = BodyType<RoomSettingsUpdate>
+    export type UpdateRoomSettingsMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host controls — mood shift, automatic/manual matching, privacy lock
+ */
+export const useUpdateRoomSettings = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ValidationErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoomSettings>>, TError,{data: BodyType<RoomSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRoomSettings>>,
+        TError,
+        {data: BodyType<RoomSettingsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateRoomSettingsMutationOptions(options));
+    }
+
+export const getEjectMemberUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/rooms/current/members/${uid}/eject`
+}
+
+/**
+ * Removes the rider from the room and video, and keeps them out of this room for the rest of its life (also through matchmaking). Their ride continues. They get `ROOM_EJECTED`.
+ * @summary Host — eject a rider
+ */
+export const ejectMember = async (uid: string, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getEjectMemberUrl(uid),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getEjectMemberMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ejectMember>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ejectMember>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['ejectMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ejectMember>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  ejectMember(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EjectMemberMutationResult = NonNullable<Awaited<ReturnType<typeof ejectMember>>>
+
+    export type EjectMemberMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — eject a rider
+ */
+export const useEjectMember = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ejectMember>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ejectMember>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getEjectMemberMutationOptions(options));
+    }
+
+export const getMuteMemberUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/rooms/current/members/${uid}/mute`
+}
+
+/**
+ * Mutes the rider’s microphone on the video server and sends them `FORCE_MUTED` ("The Host has muted your microphone."). They can unmute themselves later.
+ * @summary Host — force-mute a rider
+ */
+export const muteMember = async (uid: string, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getMuteMemberUrl(uid),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMuteMemberMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteMember>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof muteMember>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['muteMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof muteMember>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  muteMember(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MuteMemberMutationResult = NonNullable<Awaited<ReturnType<typeof muteMember>>>
+
+    export type MuteMemberMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — force-mute a rider
+ */
+export const useMuteMember = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteMember>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof muteMember>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getMuteMemberMutationOptions(options));
+    }
+
+export const getFlagMemberUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/rooms/current/members/${uid}/flag`
+}
+
+/**
+ * Creates a moderation report (source `host_flag`) with recent room chat. Invisible to the flagged rider; the room carries on.
+ * @summary Host — silently flag a rider for Trust & Safety
+ */
+export const flagMember = async (uid: string,
+    flagRequest?: FlagRequest, options?: RequestInit): Promise<ReportResult> => {
+
+  return customFetch<ReportResult>(getFlagMemberUrl(uid),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(flagRequest)
+  }
+);}
+
+
+
+
+
+export const getFlagMemberMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof flagMember>>, TError,{uid: string;data?: BodyType<FlagRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof flagMember>>, TError,{uid: string;data?: BodyType<FlagRequest>}, TContext> => {
+
+const mutationKey = ['flagMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof flagMember>>, {uid: string;data?: BodyType<FlagRequest>}> = (props) => {
+          const {uid,data} = props ?? {};
+
+          return  flagMember(uid,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FlagMemberMutationResult = NonNullable<Awaited<ReturnType<typeof flagMember>>>
+    export type FlagMemberMutationBody = BodyType<FlagRequest> | undefined
+    export type FlagMemberMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — silently flag a rider for Trust & Safety
+ */
+export const useFlagMember = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof flagMember>>, TError,{uid: string;data?: BodyType<FlagRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof flagMember>>,
+        TError,
+        {uid: string;data?: BodyType<FlagRequest>},
+        TContext
+      > => {
+      return useMutation(getFlagMemberMutationOptions(options));
+    }
+
+export const getGetUserProfileUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/users/${uid}`
+}
+
+/**
+ * Live room status is only included for friends (you follow each other).
+ * @summary Public profile with follow counts and your relationship
+ */
+export const getUserProfile = async (uid: string, options?: RequestInit): Promise<PublicProfile> => {
+
+  return customFetch<PublicProfile>(getGetUserProfileUrl(uid),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserProfileQueryKey = (uid: string,) => {
+    return [
+    `/api/v1/users/${uid}`
+    ] as const;
+    }
+
+
+export const getGetUserProfileQueryOptions = <TData = Awaited<ReturnType<typeof getUserProfile>>, TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>>(uid: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserProfileQueryKey(uid);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserProfile>>> = ({ signal }) => getUserProfile(uid, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: uid !== null && uid !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getUserProfile>>>
+export type GetUserProfileQueryError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+
+/**
+ * @summary Public profile with follow counts and your relationship
+ */
+
+export function useGetUserProfile<TData = Awaited<ReturnType<typeof getUserProfile>>, TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>>(
+ uid: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserProfileQueryOptions(uid,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getFollowUserUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/users/${uid}/follow`
+}
+
+/**
+ * @summary Follow a rider
+ */
+export const followUser = async (uid: string, options?: RequestInit): Promise<FollowResult> => {
+
+  return customFetch<FollowResult>(getFollowUserUrl(uid),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getFollowUserMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followUser>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof followUser>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['followUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof followUser>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  followUser(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FollowUserMutationResult = NonNullable<Awaited<ReturnType<typeof followUser>>>
+
+    export type FollowUserMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Follow a rider
+ */
+export const useFollowUser = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followUser>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof followUser>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getFollowUserMutationOptions(options));
+    }
+
+export const getUnfollowUserUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/users/${uid}/follow`
+}
+
+/**
+ * @summary Unfollow a rider
+ */
+export const unfollowUser = async (uid: string, options?: RequestInit): Promise<FollowResult> => {
+
+  return customFetch<FollowResult>(getUnfollowUserUrl(uid),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnfollowUserMutationOptions = <TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unfollowUser>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unfollowUser>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['unfollowUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unfollowUser>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  unfollowUser(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnfollowUserMutationResult = NonNullable<Awaited<ReturnType<typeof unfollowUser>>>
+
+    export type UnfollowUserMutationError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Unfollow a rider
+ */
+export const useUnfollowUser = <TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unfollowUser>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unfollowUser>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getUnfollowUserMutationOptions(options));
+    }
+
+export const getListFollowingUrl = () => {
+
+
+
+
+  return `/api/v1/me/following`
+}
+
+/**
+ * @summary Riders you follow (friends who are riding now first)
+ */
+export const listFollowing = async ( options?: RequestInit): Promise<SocialList> => {
+
+  return customFetch<SocialList>(getListFollowingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFollowingQueryKey = () => {
+    return [
+    `/api/v1/me/following`
+    ] as const;
+    }
+
+
+export const getListFollowingQueryOptions = <TData = Awaited<ReturnType<typeof listFollowing>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFollowingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowing>>> = ({ signal }) => listFollowing({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFollowingQueryResult = NonNullable<Awaited<ReturnType<typeof listFollowing>>>
+export type ListFollowingQueryError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>
+
+
+/**
+ * @summary Riders you follow (friends who are riding now first)
+ */
+
+export function useListFollowing<TData = Awaited<ReturnType<typeof listFollowing>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFollowingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListFollowersUrl = () => {
+
+
+
+
+  return `/api/v1/me/followers`
+}
+
+/**
+ * @summary Riders who follow you
+ */
+export const listFollowers = async ( options?: RequestInit): Promise<SocialList> => {
+
+  return customFetch<SocialList>(getListFollowersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFollowersQueryKey = () => {
+    return [
+    `/api/v1/me/followers`
+    ] as const;
+    }
+
+
+export const getListFollowersQueryOptions = <TData = Awaited<ReturnType<typeof listFollowers>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFollowersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowers>>> = ({ signal }) => listFollowers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFollowersQueryResult = NonNullable<Awaited<ReturnType<typeof listFollowers>>>
+export type ListFollowersQueryError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>
+
+
+/**
+ * @summary Riders who follow you
+ */
+
+export function useListFollowers<TData = Awaited<ReturnType<typeof listFollowers>>, TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFollowersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getInviteToRoomUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/current/invites`
+}
+
+/**
+ * The invitee must follow you or be followed by you. They get `ROOM_INVITE`; the invite lasts
+ * 10 minutes and lets them into the room even while it is Manual or locked (never past an
+ * ejection or a recent skip).
+ * @summary Host — invite someone from your network into your room
+ */
+export const inviteToRoom = async (inviteRequest: InviteRequest, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getInviteToRoomUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(inviteRequest)
+  }
+);}
+
+
+
+
+
+export const getInviteToRoomMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteToRoom>>, TError,{data: BodyType<InviteRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteToRoom>>, TError,{data: BodyType<InviteRequest>}, TContext> => {
+
+const mutationKey = ['inviteToRoom'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteToRoom>>, {data: BodyType<InviteRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  inviteToRoom(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteToRoomMutationResult = NonNullable<Awaited<ReturnType<typeof inviteToRoom>>>
+    export type InviteToRoomMutationBody = BodyType<InviteRequest>
+    export type InviteToRoomMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — invite someone from your network into your room
+ */
+export const useInviteToRoom = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteToRoom>>, TError,{data: BodyType<InviteRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteToRoom>>,
+        TError,
+        {data: BodyType<InviteRequest>},
+        TContext
+      > => {
+      return useMutation(getInviteToRoomMutationOptions(options));
+    }
+
+export const getRequestToJoinRoomUrl = (roomId: string,) => {
+
+
+
+
+  return `/api/v1/rooms/${roomId}/requests`
+}
+
+/**
+ * Only for friends of the host (you follow each other) and only while the room is private. The host gets `ROOM_JOIN_REQUEST`.
+ * @summary Ask a friend's private room for a seat
+ */
+export const requestToJoinRoom = async (roomId: string, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getRequestToJoinRoomUrl(roomId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRequestToJoinRoomMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestToJoinRoom>>, TError,{roomId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestToJoinRoom>>, TError,{roomId: string}, TContext> => {
+
+const mutationKey = ['requestToJoinRoom'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestToJoinRoom>>, {roomId: string}> = (props) => {
+          const {roomId} = props ?? {};
+
+          return  requestToJoinRoom(roomId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestToJoinRoomMutationResult = NonNullable<Awaited<ReturnType<typeof requestToJoinRoom>>>
+
+    export type RequestToJoinRoomMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Ask a friend's private room for a seat
+ */
+export const useRequestToJoinRoom = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestToJoinRoom>>, TError,{roomId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestToJoinRoom>>,
+        TError,
+        {roomId: string},
+        TContext
+      > => {
+      return useMutation(getRequestToJoinRoomMutationOptions(options));
+    }
+
+export const getListJoinRequestsUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/current/requests`
+}
+
+/**
+ * @summary Host — pending join requests
+ */
+export const listJoinRequests = async ( options?: RequestInit): Promise<JoinRequestList> => {
+
+  return customFetch<JoinRequestList>(getListJoinRequestsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListJoinRequestsQueryKey = () => {
+    return [
+    `/api/v1/rooms/current/requests`
+    ] as const;
+    }
+
+
+export const getListJoinRequestsQueryOptions = <TData = Awaited<ReturnType<typeof listJoinRequests>>, TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listJoinRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListJoinRequestsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listJoinRequests>>> = ({ signal }) => listJoinRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listJoinRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListJoinRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof listJoinRequests>>>
+export type ListJoinRequestsQueryError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+
+/**
+ * @summary Host — pending join requests
+ */
+
+export function useListJoinRequests<TData = Awaited<ReturnType<typeof listJoinRequests>>, TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listJoinRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListJoinRequestsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAcceptJoinRequestUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/rooms/current/requests/${uid}/accept`
+}
+
+/**
+ * @summary Host — accept a join request (sends the rider an invite)
+ */
+export const acceptJoinRequest = async (uid: string, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getAcceptJoinRequestUrl(uid),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcceptJoinRequestMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptJoinRequest>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptJoinRequest>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['acceptJoinRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptJoinRequest>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  acceptJoinRequest(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptJoinRequestMutationResult = NonNullable<Awaited<ReturnType<typeof acceptJoinRequest>>>
+
+    export type AcceptJoinRequestMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — accept a join request (sends the rider an invite)
+ */
+export const useAcceptJoinRequest = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptJoinRequest>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptJoinRequest>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getAcceptJoinRequestMutationOptions(options));
+    }
+
+export const getDeclineJoinRequestUrl = (uid: string,) => {
+
+
+
+
+  return `/api/v1/rooms/current/requests/${uid}/decline`
+}
+
+/**
+ * @summary Host — decline a join request
+ */
+export const declineJoinRequest = async (uid: string, options?: RequestInit): Promise<ModerationResult> => {
+
+  return customFetch<ModerationResult>(getDeclineJoinRequestUrl(uid),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeclineJoinRequestMutationOptions = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineJoinRequest>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof declineJoinRequest>>, TError,{uid: string}, TContext> => {
+
+const mutationKey = ['declineJoinRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof declineJoinRequest>>, {uid: string}> = (props) => {
+          const {uid} = props ?? {};
+
+          return  declineJoinRequest(uid,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeclineJoinRequestMutationResult = NonNullable<Awaited<ReturnType<typeof declineJoinRequest>>>
+
+    export type DeclineJoinRequestMutationError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>
+
+    /**
+ * @summary Host — decline a join request
+ */
+export const useDeclineJoinRequest = <TError = ErrorType<UnauthorizedResponse | ErrorResponse | ServiceUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineJoinRequest>>, TError,{uid: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof declineJoinRequest>>,
+        TError,
+        {uid: string},
+        TContext
+      > => {
+      return useMutation(getDeclineJoinRequestMutationOptions(options));
     }
 
 export const getListRoomMessagesUrl = () => {

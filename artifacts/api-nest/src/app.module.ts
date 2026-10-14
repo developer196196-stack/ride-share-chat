@@ -11,6 +11,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { SafetyModule } from './safety/safety.module';
+import { SocialModule } from './social/social.module';
 import { ValidationModule } from './validation/validation.module';
 import { loadAppConfig } from './config/configuration';
 
@@ -29,6 +30,7 @@ import { loadAppConfig } from './config/configuration';
     PreferencesModule,
     RoomsModule,
     SafetyModule,
+    SocialModule,
     GatewayModule,
   ],
 })

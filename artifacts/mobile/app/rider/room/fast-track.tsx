@@ -57,7 +57,7 @@ export default function FastTrackScreen() {
     await leave.mutateAsync().catch(() => undefined);
     useTripStore.getState().setRoom(null);
     useTripStore.getState().setActive(true);
-    router.replace(routes.vibeSelection);
+    router.replace(routes.discover);
   };
 
   const vibeLabel = vibeOption(vibe).label;

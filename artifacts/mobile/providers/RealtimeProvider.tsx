@@ -4,6 +4,11 @@ import { getGetPreferencesQueryOptions, type ValidationSnapshot } from '@workspa
 import {
   ServerEvents,
   type ChatPayload,
+  type HostChangedPayload,
+  type JoinRequestPayload,
+  type RoomInvitePayload,
+  type ModerationNoticePayload,
+  type RoomSettingsPayload,
   type MemberJoinedPayload,
   type MemberLeftPayload,
   type SessionTerminatedPayload,
@@ -52,6 +57,37 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     });
     socket.on(ServerEvents.ROOM_MEMBER_LEFT, (payload: MemberLeftPayload) => {
       useTripStore.getState().removeMember(payload.roomId, payload.uid);
+    });
+    socket.on(ServerEvents.ROOM_HOST_CHANGED, (payload: HostChangedPayload) => {
+      useTripStore.getState().setHost(payload.roomId, payload.hostUid);
+    });
+    socket.on(ServerEvents.ROOM_SETTINGS_CHANGED, ({ roomId, ...settings }: RoomSettingsPayload) => {
+      useTripStore.getState().setRoomSettings(roomId, settings);
+    });
+    socket.on(ServerEvents.ROOM_EJECTED, (payload: ModerationNoticePayload) => {
+      const store = useTripStore.getState();
+      // The ride goes on; the active room screen sends the rider back to the Discovery Grid.
+      if (store.room?.roomId === payload.roomId) store.setRoom(null);
+      store.setNotice({ message: payload.message, tone: 'warning' });
+    });
+    socket.on(ServerEvents.FORCE_MUTED, (payload: ModerationNoticePayload) => {
+      const store = useTripStore.getState();
+      if (store.room?.roomId !== payload.roomId) return;
+      store.setForceMutedAt(Date.now());
+      store.setNotice({ message: payload.message, tone: 'warning' });
+    });
+    socket.on(ServerEvents.ROOM_INVITE, (payload: RoomInvitePayload) => {
+      if (useTripStore.getState().room?.roomId === payload.roomId) return;
+      useTripStore.getState().setInvite(payload);
+    });
+    socket.on(ServerEvents.ROOM_JOIN_REQUEST, (payload: JoinRequestPayload) => {
+      const store = useTripStore.getState();
+      if (store.room?.roomId !== payload.roomId) return;
+      store.setNewRequests((n) => n + 1);
+      store.setNotice({ message: `${payload.requester.displayName} asked to join your room.` });
+    });
+    socket.on(ServerEvents.ROOM_REQUEST_DECLINED, (payload: ModerationNoticePayload) => {
+      useTripStore.getState().setNotice({ message: payload.message, tone: 'warning' });
     });
     socket.on(ServerEvents.CHAT_MESSAGE_TRANSLATED, (message: ChatPayload) => {
       useTripStore.getState().addMessage(message);

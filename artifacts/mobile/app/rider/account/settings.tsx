@@ -76,7 +76,7 @@ export default function SettingsScreen() {
               icon="solarArrowLeftLinear"
               shape="rounded"
               color={colors.foreground}
-              onPress={() => (router.canGoBack() ? router.back() : router.replace(routes.vibeSelection))}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace(routes.discover))}
             />
             <View>
               <Text style={styles.title}>Trust & Settings</Text>
@@ -168,6 +168,13 @@ export default function SettingsScreen() {
               icon="solarForwardBold"
               title="Skipped riders are blocked for 60 minutes"
               caption="Anyone you leave with Next won't be matched with you again for an hour"
+            />
+            <Divider />
+            <SettingsRow
+              icon="solarUsersGroupRoundedBold"
+              title="Friends & Followers"
+              caption="Follow riders; friends can see when you're riding"
+              onPress={() => router.push(routes.network)}
             />
             <Divider />
             <SettingsRow

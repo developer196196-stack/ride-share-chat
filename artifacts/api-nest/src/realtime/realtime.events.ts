@@ -18,6 +18,20 @@ export const ServerEvents = {
   CHAT_MESSAGE_TRANSLATED: 'CHAT_MESSAGE_TRANSLATED',
   ROOM_MEMBER_JOINED: 'ROOM_MEMBER_JOINED',
   ROOM_MEMBER_LEFT: 'ROOM_MEMBER_LEFT',
+  /** The room's moderator changed (the host left; the longest-present rider takes over). */
+  ROOM_HOST_CHANGED: 'ROOM_HOST_CHANGED',
+  /** Host changed the mood, matching mode or privacy lock. */
+  ROOM_SETTINGS_CHANGED: 'ROOM_SETTINGS_CHANGED',
+  /** To the ejected rider only. */
+  ROOM_EJECTED: 'ROOM_EJECTED',
+  /** To the muted rider only: turn the local microphone off and show the notice. */
+  FORCE_MUTED: 'FORCE_MUTED',
+  /** To the invitee: the host invited you (or accepted your join request). */
+  ROOM_INVITE: 'ROOM_INVITE',
+  /** To the host: a friend asks for a seat in your private room. */
+  ROOM_JOIN_REQUEST: 'ROOM_JOIN_REQUEST',
+  /** To the requester: the host declined. */
+  ROOM_REQUEST_DECLINED: 'ROOM_REQUEST_DECLINED',
   SESSION_TERMINATED: 'SESSION_TERMINATED',
 } as const;
 

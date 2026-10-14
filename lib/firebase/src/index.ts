@@ -8,6 +8,8 @@ export {
   FirestoreCollections,
   TRUSTED_CONTACTS_SUBCOLLECTION,
   RIDES_SUBCOLLECTION,
+  FOLLOWING_SUBCOLLECTION,
+  FOLLOWERS_SUBCOLLECTION,
   userDocPath,
   userAvatarStoragePrefix,
   type FirestoreCollectionName,

@@ -1,19 +1,22 @@
 /**
  * Sleek 8 — Trip Validation (pending / pre-verification) screen.
- * Live Trip Validation Engine state: speed (Module 1), vibration (Module 2), ground truth
- * (Module 3), weighted score and state. Enter Vibe Queue unlocks at VERIFIED.
+ * Launch experience (client doc 5): a frosted ring spins while the engine checks the ride, turns
+ * amber with a calm "Waiting for your ride to start…" sheet when the rider isn't moving yet, and
+ * glows green then continues to the Discovery Grid once VERIFIED. The live engine detail (speed,
+ * vibration, ground truth, score) stays available under "Verification details".
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import type { ValidationSnapshot } from '@workspace/api-client-react';
 import { colors, withAlpha } from '@/constants/colors';
 import { radius, shadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
 import type { IconName } from '@/constants/icons';
 import { fonts, textSize, tracking } from '@/constants/typography';
-import { Button, Card, ErrorBanner, GlowBlob, Icon, IconButton, LiveDot, Pill, Screen, Spin } from '@/components/ui';
-import { LogoTile } from '@/components/rideshare';
+import { Button, Card, GlowBlob, Icon, IconButton, LiveDot, Pill, Screen, Spin } from '@/components/ui';
+import { LogoTile, ValidationRing, type RingTone } from '@/components/rideshare';
 import { SafetyFab } from '@/components/safety/SafetyFab';
 import { SafetySheet } from '@/components/safety/SafetySheet';
 import { useTrip } from '@/hooks/use-trip';
@@ -24,6 +27,11 @@ import { formatGraceDuration, thresholdsOf } from '@/lib/validation/thresholds';
 
 const BAR_PATTERN = [0.35, 0.55, 0.9, 0.7, 1, 0.8, 0.45, 0.65, 0.35];
 
+/** How long the ring shows "checking" before a not-yet-moving rider sees the waiting sheet. */
+const CHECKING_MS = 6_000;
+/** Pause on the green ring before continuing to the Vibe Queue. */
+const VERIFIED_HOLD_MS = 1_200;
+
 type CheckState = 'done' | 'pending' | 'failed' | 'unavailable';
 type Check = { icon: IconName; title: string; caption: string; state: CheckState };
 
@@ -31,6 +39,7 @@ const STATE_COPY: Record<ValidationSnapshot['state'], { title: string; pill: str
   PENDING: { title: 'Verifying your ride', pill: 'Pending' },
   VERIFIED: { title: 'Transit verified', pill: 'Active Ride' },
   GRACE: { title: 'Vehicle stopped', pill: 'Grace Period' },
+  POST_RIDE: { title: 'Ride ended', pill: 'Post-Ride' },
   TERMINATED: { title: 'Session ended', pill: 'Terminated' },
 };
 
@@ -77,18 +86,80 @@ const SCENARIOS: { key: SimulatorScenario; label: string }[] = [
   { key: 'walking', label: 'Walk out' },
 ];
 
+function ringFor(
+  state: ValidationSnapshot['state'],
+  checking: boolean,
+  speedMph: number,
+  powerSaver: boolean,
+): { tone: RingTone; title: string; caption: string } {
+  switch (state) {
+    case 'VERIFIED':
+      return {
+        tone: 'verified',
+        title: "You're verified",
+        caption: `${Math.round(speedMph)} MPH · ${powerSaver ? 'battery saver on' : 'in transit'}`,
+      };
+    case 'GRACE':
+      return { tone: 'stopped', title: 'Vehicle stopped', caption: 'Your seat is held while traffic clears' };
+    case 'POST_RIDE':
+      return { tone: 'stopped', title: 'Ride ended', caption: 'Your R.O.O.M. stays live for a few minutes' };
+    case 'TERMINATED':
+      return { tone: 'ended', title: 'Session ended', caption: 'Tap Restart to verify a new ride' };
+    default:
+      return checking
+        ? { tone: 'checking', title: 'Checking your ride…', caption: 'Reading GPS, motion and vehicle sensors' }
+        : { tone: 'waiting', title: 'Waiting for your ride', caption: `${Math.round(speedMph)} MPH so far` };
+  }
+}
+
 export default function TripValidationScreen() {
   const router = useRouter();
   const { startTrip } = useTrip();
   const snapshot = useTripStore((s) => s.snapshot);
   const connected = useTripStore((s) => s.connected);
+  const powerSaver = useTripStore((s) => s.powerSaver);
   const scenario = useSimulatorStore((s) => s.scenario);
   const setScenario = useSimulatorStore((s) => s.setScenario);
   const [shareOpen, setShareOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const previousState = useRef<ValidationSnapshot['state'] | null>(null);
+  // This screen stays mounted under the room; only the visible screen may navigate.
+  const focused = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+      };
+    }, []),
+  );
+
+  const restart = () => {
+    setChecking(true);
+    void startTrip();
+  };
 
   useEffect(() => {
     void startTrip();
   }, [startTrip]);
+
+  // Give the sensors a few seconds before telling a stationary rider to wait.
+  useEffect(() => {
+    if (!checking) return;
+    const timer = setTimeout(() => setChecking(false), CHECKING_MS);
+    return () => clearTimeout(timer);
+  }, [checking]);
+
+  // Becoming VERIFIED on this screen glows green, then continues to the Discovery Grid.
+  const liveState = snapshot?.state ?? null;
+  useEffect(() => {
+    const before = previousState.current;
+    previousState.current = liveState;
+    if (liveState !== 'VERIFIED' || before == null || before === 'VERIFIED' || detailsOpen || !focused.current) return;
+    const timer = setTimeout(() => router.push(routes.discover), VERIFIED_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [liveState, detailsOpen, router]);
 
   const state = snapshot?.state ?? 'PENDING';
   const copy = STATE_COPY[state];
@@ -99,9 +170,9 @@ export default function TripValidationScreen() {
   const verified = state === 'VERIFIED';
   const thresholds = thresholdsOf(snapshot);
 
-  let ctaLabel = 'Waiting for verification…';
-  if (verified) ctaLabel = 'Enter Vibe Queue';
-  else if (state === 'GRACE') ctaLabel = 'Waiting for speed recovery…';
+  const ring = ringFor(state, checking, speed, powerSaver);
+  const waiting = ring.tone === 'waiting';
+
 
   return (
     <View style={styles.root}>
@@ -120,110 +191,138 @@ export default function TripValidationScreen() {
           <IconButton icon="solarQuestionCircleLinear" onPress={() => router.push(routes.howItWorks)} />
         </View>
 
-        <Card style={styles.telemetry}>
-          <GlowBlob color={colors.primary} opacity={0.1} size={224} style={styles.telemetryGlow} />
-          <View style={styles.telemetryHeader}>
-            <View>
-              <Text style={styles.telemetryEyebrow}>LIVE SENSOR TELEMETRY</Text>
-              <Text style={styles.telemetryTitle}>{copy.title}</Text>
-            </View>
-            <View style={styles.activePill}>
-              <LiveDot size={6} color={verified ? colors.accent : colors.chart3} />
-              <Text style={[styles.activePillText, !verified && { color: colors.chart3 }]}>{copy.pill}</Text>
-            </View>
-          </View>
+        <ValidationRing tone={ring.tone} title={ring.title} caption={ring.caption} />
 
-          <View style={styles.gaugeWrap}>
-            <View style={styles.gauge}>
-              <View style={[styles.gaugeArc, !snapshot?.checks.gpsSpeedLock && styles.gaugeArcIdle]} />
-              <Text style={styles.speed}>{Math.round(speed)}</Text>
-              <Text style={styles.speedUnit}>MPH</Text>
-              <View style={styles.thresholdAnchor} pointerEvents="none">
-                <View style={styles.thresholdBase}>
-                  <View style={styles.thresholdPill}>
-                    <Text style={styles.thresholdText}>
-                      {snapshot?.checks.gpsSpeedLock
-                        ? `> ${thresholds.entryMph} MPH Threshold Met`
-                        : `Needs > ${thresholds.entryMph} MPH for ${thresholds.entrySustainSec} s`}
-                    </Text>
+        {waiting ? (
+          <Animated.View entering={SlideInDown.springify().damping(18)} style={styles.waitSheet}>
+            <View style={styles.waitHandle} />
+            <Text style={styles.waitTitle}>Waiting for your ride to start…</Text>
+            <Text style={styles.waitBody}>
+              We'll let you in as soon as you hit the road. Keep the app open — verification needs more than{' '}
+              {thresholds.entryMph} MPH for {thresholds.entrySustainSec} seconds.
+            </Text>
+          </Animated.View>
+        ) : null}
+
+        <Pressable
+          onPress={() => setDetailsOpen((open) => !open)}
+          style={styles.detailsToggle}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: detailsOpen }}
+        >
+          <Text style={styles.detailsToggleText}>Verification details</Text>
+          <Icon
+            name="solarAltArrowDownLinear"
+            size={16}
+            color={colors.mutedForeground}
+            style={detailsOpen ? styles.chevronOpen : undefined}
+          />
+        </Pressable>
+
+        {detailsOpen ? (
+          <Animated.View entering={FadeIn.duration(200)}>
+            <Card style={styles.telemetry}>
+              <GlowBlob color={colors.primary} opacity={0.1} size={224} style={styles.telemetryGlow} />
+              <View style={styles.telemetryHeader}>
+                <View>
+                  <Text style={styles.telemetryEyebrow}>LIVE SENSOR TELEMETRY</Text>
+                  <Text style={styles.telemetryTitle}>{copy.title}</Text>
+                </View>
+                <View style={styles.activePill}>
+                  <LiveDot size={6} color={verified ? colors.accent : colors.chart3} />
+                  <Text style={[styles.activePillText, !verified && { color: colors.chart3 }]}>{copy.pill}</Text>
+                </View>
+              </View>
+
+              <View style={styles.gaugeWrap}>
+                <View style={styles.gauge}>
+                  <View style={[styles.gaugeArc, !snapshot?.checks.gpsSpeedLock && styles.gaugeArcIdle]} />
+                  <Text style={styles.speed}>{Math.round(speed)}</Text>
+                  <Text style={styles.speedUnit}>MPH</Text>
+                  <View style={styles.thresholdAnchor} pointerEvents="none">
+                    <View style={styles.thresholdBase}>
+                      <View style={styles.thresholdPill}>
+                        <Text style={styles.thresholdText}>
+                          {snapshot?.checks.gpsSpeedLock
+                            ? `> ${thresholds.entryMph} MPH Threshold Met`
+                            : `Needs > ${thresholds.entryMph} MPH for ${thresholds.entrySustainSec} s`}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
               </View>
+
+              <View style={styles.bars}>
+                {BAR_PATTERN.map((h, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.bar,
+                      {
+                        height: 6 + 30 * h * vibrationLevel,
+                        backgroundColor: withAlpha(colors.primary, Math.min(1, 0.3 + 0.7 * h * vibrationLevel)),
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.telemetryCaption}>Validation score</Text>
+                <Text style={styles.scoreValue}>
+                  {snapshot?.score ?? 0}/100 · needs {thresholds.verifiedScore}
+                </Text>
+              </View>
+            </Card>
+
+            <View style={styles.checklistSection}>
+              <View style={styles.checklistHeader}>
+                <Text style={styles.sectionTitle}>Verification Checklist</Text>
+                <Text style={styles.sectionMeta}>{completed} of 3 complete</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${(completed / 3) * 100}%` }]} />
+              </View>
+              <Card rounded="xl" style={styles.checklist}>
+                {checks.map((c, i) => {
+                  let tint: string = colors.primary;
+                  if (c.state === 'done') tint = colors.accent;
+                  else if (c.state === 'failed') tint = colors.destructive;
+                  return (
+                    <View key={c.title} style={[styles.checkRow, i > 0 && styles.checkDivider]}>
+                      <View style={[styles.checkIcon, { backgroundColor: withAlpha(tint, 0.1) }]}>
+                        <Icon name={c.icon} size={20} color={tint} />
+                      </View>
+                      <View style={styles.checkText}>
+                        <Text style={styles.checkTitle}>{c.title}</Text>
+                        <Text style={styles.checkCaption}>{c.caption}</Text>
+                      </View>
+                      {c.state === 'done' ? <Icon name="solarCheckCircleBold" size={20} color={colors.accent} /> : null}
+                      {c.state === 'failed' ? <Icon name="solarCloseCircleLinear" size={20} color={colors.destructive} /> : null}
+                      {c.state === 'unavailable' ? (
+                        <Icon name="solarQuestionCircleLinear" size={20} color={colors.mutedForeground} />
+                      ) : null}
+                      {c.state === 'pending' ? <Spin style={styles.spinner} /> : null}
+                    </View>
+                  );
+                })}
+              </Card>
             </View>
-          </View>
 
-          <View style={styles.bars}>
-            {BAR_PATTERN.map((h, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.bar,
-                  {
-                    height: 6 + 30 * h * vibrationLevel,
-                    backgroundColor: withAlpha(colors.primary, Math.min(1, 0.3 + 0.7 * h * vibrationLevel)),
-                  },
-                ]}
-              />
-            ))}
-          </View>
-          <View style={styles.scoreRow}>
-            <Text style={styles.telemetryCaption}>Validation score</Text>
-            <Text style={styles.scoreValue}>
-              {snapshot?.score ?? 0}/100 · needs {thresholds.verifiedScore}
-            </Text>
-          </View>
-        </Card>
-
-        {state === 'TERMINATED' ? (
-          <ErrorBanner style={styles.banner} message="This validation session ended. Tap Restart to verify a new ride." />
-        ) : null}
-
-        <View style={styles.checklistSection}>
-          <View style={styles.checklistHeader}>
-            <Text style={styles.sectionTitle}>Verification Checklist</Text>
-            <Text style={styles.sectionMeta}>{completed} of 3 complete</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${(completed / 3) * 100}%` }]} />
-          </View>
-          <Card rounded="xl" style={styles.checklist}>
-            {checks.map((c, i) => {
-              let tint: string = colors.primary;
-              if (c.state === 'done') tint = colors.accent;
-              else if (c.state === 'failed') tint = colors.destructive;
-              return (
-                <View key={c.title} style={[styles.checkRow, i > 0 && styles.checkDivider]}>
-                  <View style={[styles.checkIcon, { backgroundColor: withAlpha(tint, 0.1) }]}>
-                    <Icon name={c.icon} size={20} color={tint} />
-                  </View>
-                  <View style={styles.checkText}>
-                    <Text style={styles.checkTitle}>{c.title}</Text>
-                    <Text style={styles.checkCaption}>{c.caption}</Text>
-                  </View>
-                  {c.state === 'done' ? <Icon name="solarCheckCircleBold" size={20} color={colors.accent} /> : null}
-                  {c.state === 'failed' ? <Icon name="solarCloseCircleLinear" size={20} color={colors.destructive} /> : null}
-                  {c.state === 'unavailable' ? (
-                    <Icon name="solarQuestionCircleLinear" size={20} color={colors.mutedForeground} />
-                  ) : null}
-                  {c.state === 'pending' ? <Spin style={styles.spinner} /> : null}
+            <Card rounded="xl" style={styles.grace}>
+              <View style={styles.graceLeft}>
+                <View style={styles.graceIcon}>
+                  <Icon name="solarLockKeyholeLinear" size={20} color={colors.mutedForeground} />
                 </View>
-              );
-            })}
-          </Card>
-        </View>
-
-        <Card rounded="xl" style={styles.grace}>
-          <View style={styles.graceLeft}>
-            <View style={styles.graceIcon}>
-              <Icon name="solarLockKeyholeLinear" size={20} color={colors.mutedForeground} />
-            </View>
-            <View style={styles.graceText}>
-              <Text style={styles.checkTitle}>{formatGraceDuration(thresholds.graceDurationSec)} Traffic Grace Timer</Text>
-              <Text style={styles.checkCaption}>Stay in room during red lights and heavy jams</Text>
-            </View>
-          </View>
-          <Pill label="Always on" tone="accent" size="10" />
-        </Card>
+                <View style={styles.graceText}>
+                  <Text style={styles.checkTitle}>{formatGraceDuration(thresholds.graceDurationSec)} Traffic Grace Timer</Text>
+                  <Text style={styles.checkCaption}>Stay in room during red lights and heavy jams</Text>
+                </View>
+              </View>
+              <Pill label="Always on" tone="accent" size="10" />
+            </Card>
+          </Animated.View>
+        ) : null}
 
         {env.allowSimulatedRide ? (
           <Card rounded="xl" style={styles.simulator}>
@@ -252,11 +351,11 @@ export default function TripValidationScreen() {
             borderRadius={radius.xl}
             weight="semibold"
             style={styles.cta}
-            onPress={() => void startTrip()}
+            onPress={restart}
           />
-        ) : (
+        ) : verified ? (
           <Button
-            label={ctaLabel}
+            label="Find a Room"
             icon="solarLogin2Bold"
             iconSize={20}
             iconPosition="left"
@@ -264,10 +363,9 @@ export default function TripValidationScreen() {
             borderRadius={radius.xl}
             weight="semibold"
             style={styles.cta}
-            disabled={!verified}
-            onPress={() => router.push(routes.vibeSelection)}
+            onPress={() => router.push(routes.discover)}
           />
-        )}
+        ) : null}
         <Button
           label="Share Trip Status"
           variant="outline"
@@ -295,7 +393,38 @@ const RING = 10;
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fab: { bottom: 32 },
-  banner: { marginTop: 16 },
+  waitSheet: {
+    marginTop: 4,
+    padding: 18,
+    paddingTop: 10,
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: withAlpha(colors.chart3, 0.3),
+    backgroundColor: withAlpha(colors.chart3, 0.08),
+    gap: 6,
+  },
+  waitHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: withAlpha(colors.chart3, 0.35),
+    marginBottom: 6,
+  },
+  waitTitle: { ...textSize.base, fontFamily: fonts.heading.bold, color: colors.foreground },
+  waitBody: { ...textSize.sm, fontFamily: fonts.sans.regular, color: colors.mutedForeground },
+  detailsToggle: {
+    marginTop: 16,
+    marginBottom: 4,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  detailsToggleText: { ...textSize.xs, fontFamily: fonts.sans.semibold, color: colors.mutedForeground },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
   scoreRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   scoreValue: { ...textSize.xs, fontFamily: fonts.mono.bold, color: colors.foreground, marginTop: 12 },
   gaugeArcIdle: { borderTopColor: colors.slate400, borderRightColor: colors.slate400 },

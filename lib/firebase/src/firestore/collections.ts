@@ -8,6 +8,9 @@ export const FirestoreCollections = {
 /** Subcollections of `users/{uid}`. */
 export const TRUSTED_CONTACTS_SUBCOLLECTION = 'trustedContacts';
 export const RIDES_SUBCOLLECTION = 'rides';
+/** `users/{uid}/following/{target}` and the mirror `users/{target}/followers/{uid}`. */
+export const FOLLOWING_SUBCOLLECTION = 'following';
+export const FOLLOWERS_SUBCOLLECTION = 'followers';
 
 export type FirestoreCollectionName = (typeof FirestoreCollections)[keyof typeof FirestoreCollections];
 

@@ -38,11 +38,13 @@ export function TripSessionHost() {
     if (!active || !isAuthenticated) {
       collector.current?.stop();
       collector.current = null;
+      useTripStore.getState().setPowerSaver(false);
       releaseKeepAwake();
       return;
     }
     const instance = new TelemetryCollector({
       onSnapshot: (snapshot) => useTripStore.getState().setSnapshot(snapshot),
+      onPowerChange: (mode) => useTripStore.getState().setPowerSaver(mode === 'saver'),
       getScenario: () => useSimulatorStore.getState().scenario,
     });
     collector.current = instance;
@@ -50,6 +52,7 @@ export function TripSessionHost() {
     void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
     return () => {
       instance.stop();
+      useTripStore.getState().setPowerSaver(false);
       releaseKeepAwake();
     };
   }, [active, isAuthenticated]);

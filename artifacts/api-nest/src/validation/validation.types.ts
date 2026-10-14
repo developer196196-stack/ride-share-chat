@@ -1,6 +1,7 @@
 /** Trip Validation Engine data types. Keep in sync with OpenAPI `Telemetry*` / `ValidationSnapshot`. */
 
-export type ValidationState = 'PENDING' | 'VERIFIED' | 'GRACE' | 'TERMINATED';
+/** POST_RIDE: the rider has left the vehicle; the session stays live for the post-ride extension. */
+export type ValidationState = 'PENDING' | 'VERIFIED' | 'GRACE' | 'POST_RIDE' | 'TERMINATED';
 
 export type ActivityType =
   | 'in_vehicle'
@@ -21,6 +22,8 @@ export type GpsReading = {
   /** Fix time from the device (ms since epoch). */
   timestamp: number;
   isMock: boolean;
+  /** Low-power network position (battery saver): live location only, never speed or spoof checks. */
+  lowPower?: boolean;
 };
 
 /** Module 2 — summary of a 3-second FFT window computed on the phone. */
@@ -90,6 +93,8 @@ export type EngineState = {
   lastMovingAt: number | null;
   graceDeadline: number | null;
   graceStartedAt: number | null;
+  /** End of the post-ride extension (POST_RIDE only). */
+  postRideDeadline: number | null;
   verifiedAt: number | null;
   lastFix: GpsReading | null;
   recentFixes: GpsReading[];
@@ -124,6 +129,8 @@ export type ValidationSnapshot = {
   };
   graceDeadline: string | null;
   graceRemainingSec: number | null;
+  postRideDeadline: string | null;
+  postRideRemainingSec: number | null;
   terminationReason: TerminationReason | null;
   /** Active thresholds (configurable via VALIDATION_* env) so the app's copy matches the server. */
   thresholds: {
@@ -131,6 +138,7 @@ export type ValidationSnapshot = {
     entrySustainSec: number;
     graceMph: number;
     graceDurationSec: number;
+    postRideDurationSec: number;
     verifiedScore: number;
   };
   updatedAt: string;

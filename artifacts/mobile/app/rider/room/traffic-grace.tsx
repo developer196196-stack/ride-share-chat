@@ -55,9 +55,10 @@ export default function TrafficGraceScreen() {
   const leave = useLeaveRoom();
   const remaining = useGraceCountdown(snapshot?.state === 'GRACE' ? snapshot.graceDeadline : null);
 
-  // Speed recovered → back to the room.
+  // Speed recovered, or the rider got out (post-ride extension) → back to the room.
   useEffect(() => {
-    if (snapshot?.state === 'VERIFIED' && router.canGoBack()) router.back();
+    const backToRoom = snapshot?.state === 'VERIFIED' || snapshot?.state === 'POST_RIDE';
+    if (backToRoom && router.canGoBack()) router.back();
   }, [snapshot?.state, router]);
 
   const exit = async () => {

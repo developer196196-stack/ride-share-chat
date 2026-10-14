@@ -12,6 +12,7 @@ type ReportInput = {
   reportedUid?: string | null;
   reason: ReportDoc['reason'];
   details?: string | null;
+  source?: NonNullable<ReportDoc['source']>;
 };
 
 @Injectable()
@@ -33,6 +34,7 @@ export class ReportsService {
       roomId,
       reason: input.reason,
       details: input.details?.trim() || null,
+      source: input.source ?? 'rider_report',
       recentMessages,
       status: 'open',
       createdAt: Timestamp.now(),

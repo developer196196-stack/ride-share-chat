@@ -17,6 +17,7 @@ export const VALIDATION_DEFAULTS = {
   graceMph: 5,
   graceSustainSec: 15,
   graceDurationSec: 300,
+  postRideSec: 180,
   verifiedScore: 80,
   graceScore: 50,
   weightGps: 0.4,
@@ -114,6 +115,9 @@ export function buildValidationConfig(env: Env = process.env) {
     /** GRACE lasts at most this long. */
     graceDurationMs: num(env, 'VALIDATION_GRACE_DURATION_SEC', d.graceDurationSec, 10, 3_600) * 1000,
 
+    /** Post-ride extension: the session stays live this long after the rider leaves the vehicle (0 = end at once). */
+    postRideMs: num(env, 'VALIDATION_POST_RIDE_SEC', d.postRideSec, 0, 3_600) * 1000,
+
     /** VERIFIED → GRACE when the score stays under the VERIFIED band this long (even while moving). */
     lowScoreSustainMs: num(env, 'VALIDATION_LOW_SCORE_SUSTAIN_SEC', d.lowScoreSustainSec, 0, 600) * 1000,
 
@@ -195,6 +199,7 @@ export function relaxedValidationOverrides(env: Env = process.env): string[] {
     ['VALIDATION_GRACE_MPH', d.graceMph],
     ['VALIDATION_GRACE_SUSTAIN_SEC', d.graceSustainSec],
     ['VALIDATION_GRACE_DURATION_SEC', d.graceDurationSec],
+    ['VALIDATION_POST_RIDE_SEC', d.postRideSec],
     ['VALIDATION_VERIFIED_SCORE', d.verifiedScore],
     ['VALIDATION_GRACE_SCORE', d.graceScore],
     ['VALIDATION_WEIGHT_GPS', d.weightGps],

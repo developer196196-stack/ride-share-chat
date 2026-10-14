@@ -6,3 +6,5 @@ android/
 ios/
 .env*.local
 *.log
+docs/
+sleek-temp-ref/

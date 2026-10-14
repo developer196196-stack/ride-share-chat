@@ -1,4 +1,12 @@
-import { ConflictException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 import type { Firestore } from 'firebase-admin/firestore';
@@ -17,9 +25,14 @@ import { ValidationService } from '../validation/validation.service';
 import type { TerminationReason } from '../validation/validation.types';
 import { LiveKitService } from './livekit.service';
 import {
+  DISCOVER_LIMIT,
   ROOM_CAPACITY,
   VIBES,
+  type DiscoverRoomDto,
+  type LiveRoomDto,
+  type RoomHostDto,
   type RideSummaryDto,
+  type RoomMatching,
   type RoomMemberDto,
   type RoomSessionDto,
   type Vibe,
@@ -32,6 +45,14 @@ const LOCK_TTL_MS = 5_000;
 const keys = {
   room: (id: string) => `room:${id}`,
   members: (id: string) => `room:${id}:members`,
+  /** uid → join time, for handing the host role to the longest-present rider. */
+  joined: (id: string) => `room:${id}:joined`,
+  /** Riders the host ejected; kept out of this room for its lifetime. */
+  ejected: (id: string) => `room:${id}:ejected`,
+  /** Host invite (or accepted join request): lets the rider into a private room. */
+  invite: (id: string, uid: string) => `room:${id}:invite:${uid}`,
+  /** Pending join requests: uid → request time. */
+  requests: (id: string) => `room:${id}:requests`,
   open: (vibe: Vibe) => `vibe:${vibe}:open`,
   all: (vibe: Vibe) => `vibe:${vibe}:all`,
   userRoom: (uid: string) => `user:${uid}:room`,
@@ -49,15 +70,48 @@ function conflict(code: string, message: string): never {
   throw new ConflictException(body);
 }
 
+type RoomMeta = { vibe?: string; hostUid?: string; matching?: string; locked?: string; createdAt?: string };
+
+/** Public = on the Discovery Grid and open to matchmaking. */
+const isPublic = (meta: RoomMeta) => meta.matching !== 'manual' && meta.locked !== '1';
+
+function forbidden(code: string, message: string): never {
+  const body: ErrorResponseBody = { code, message };
+  throw new ForbiddenException(body);
+}
+
+function memberNotFound(): never {
+  const body: ErrorResponseBody = { code: 'MEMBER_NOT_FOUND', message: "That rider isn't in your R.O.O.M. anymore." };
+  throw new NotFoundException(body);
+}
+
+/** Invites and join requests expire after this long. */
+const INVITE_TTL_SEC = 10 * 60;
+
+const EJECTED_MESSAGE = 'The host removed you from this R.O.O.M. Pick another room to keep chatting.';
+const FORCE_MUTED_MESSAGE = 'The Host has muted your microphone.';
+
+function notFound(): never {
+  const body: ErrorResponseBody = { code: 'ROOM_NOT_FOUND', message: 'That R.O.O.M. no longer exists.' };
+  throw new NotFoundException(body);
+}
+
 function newRoomId(): string {
   const hex = randomBytes(3).toString('hex').toUpperCase();
   return `ROOM-${hex.slice(0, 4)}-${hex.slice(4)}`;
 }
 
+/** Room ids look like ROOM-1A2B-3C. */
+const ROOM_ID = /^ROOM-[0-9A-F]{4}-[0-9A-F]{2}$/;
+
 /**
  * Rolling R.O.O.M.s: every vibe keeps a sorted set of rooms with open seats. A joining rider goes
  * to the fullest open room containing nobody they recently skipped, so rooms backfill as riders
  * reach their drop-off; a new room opens only when none fits.
+ *
+ * Every room has a host (moderator): the rider who hosted it, or the first rider in a room the
+ * matchmaker opened. When the host leaves, the longest-present rider takes over. Riders can also
+ * browse live rooms (Discovery Grid) and join a specific one.
  */
 @Injectable()
 export class RoomsService implements OnModuleInit {
@@ -125,6 +179,68 @@ export class RoomsService implements OnModuleInit {
     return this.redis.smembers(keys.members(roomId));
   }
 
+  /** Discovery Grid: live rooms with open seats, fullest first (newest breaks ties). */
+  async discover(uid: string): Promise<{ rooms: DiscoverRoomDto[]; liveRooms: number }> {
+    const current = await this.currentRoomId(uid);
+    const perVibe = await Promise.all(
+      VIBES.map(async (vibe) => (await this.redis.smembers(keys.all(vibe))).map((roomId) => ({ roomId, vibe }))),
+    );
+    const all = perVibe.flat();
+    const rooms = await Promise.all(
+      all.map(async ({ roomId, vibe }) => {
+        const [members, meta, ejected] = await Promise.all([
+          this.roomMembers(roomId),
+          this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+          this.redis.sismember(keys.ejected(roomId), uid),
+        ]);
+        return {
+          roomId,
+          vibe,
+          members,
+          hostUid: meta.hostUid ?? null,
+          createdAt: Number(meta.createdAt ?? 0),
+          listed: isPublic(meta) && ejected === 0,
+        };
+      }),
+    );
+    const liveRooms = rooms.filter((r) => r.members.length > 0).length;
+
+    const candidates = rooms
+      .filter((r) => r.listed && r.roomId !== current && r.members.length > 0 && r.members.length < ROOM_CAPACITY)
+      .sort((a, b) => b.members.length - a.members.length || b.createdAt - a.createdAt);
+    const visible: typeof candidates = [];
+    for (const room of candidates) {
+      if (visible.length >= DISCOVER_LIMIT) break;
+      if (await this.blockedFrom(uid, room.members)) continue;
+      visible.push(room);
+    }
+
+    const hostIds = visible.map((r) => (r.hostUid && r.members.includes(r.hostUid) ? r.hostUid : r.members[0]!));
+    const profiles = await this.profiles.getMany([...new Set(hostIds)]);
+    return {
+      liveRooms,
+      rooms: visible.map((room, i) => {
+        const hostId = hostIds[i]!;
+        const p = profiles.get(hostId);
+        return {
+          roomId: room.roomId,
+          vibe: room.vibe,
+          memberCount: room.members.length,
+          capacity: ROOM_CAPACITY,
+          host: { uid: hostId, displayName: p?.displayName ?? 'Rider', homeCity: p?.homeCity ?? null, photoUrl: p?.photoUrl ?? null },
+          createdAt: new Date(room.createdAt || Date.now()).toISOString(),
+        };
+      }),
+    };
+  }
+
+  /** True when the rider skipped (or was skipped by) any of these riders in the last 60 minutes. */
+  private async blockedFrom(uid: string, members: string[]): Promise<boolean> {
+    if (members.length === 0) return false;
+    const blocked = await Promise.all(members.map((m) => this.redis.exists(keys.block(uid, m))));
+    return blocked.some((b) => b === 1);
+  }
+
   async getCurrent(uid: string): Promise<RoomSessionDto | null> {
     const roomId = await this.currentRoomId(uid);
     if (!roomId) return null;
@@ -132,8 +248,8 @@ export class RoomsService implements OnModuleInit {
   }
 
   private async buildSession(uid: string, roomId: string): Promise<RoomSessionDto | null> {
-    const [vibe, memberIds, session] = await Promise.all([
-      this.redis.hget(keys.room(roomId), 'vibe'),
+    const [[vibe, hostUid, matching, locked], memberIds, session] = await Promise.all([
+      this.redis.hmget(keys.room(roomId), 'vibe', 'hostUid', 'matching', 'locked'),
       this.roomMembers(roomId),
       this.getRideSession(uid),
     ]);
@@ -148,6 +264,7 @@ export class RoomsService implements OnModuleInit {
           homeCity: p?.homeCity ?? null,
           photoUrl: p?.photoUrl ?? null,
           isSelf: id === uid,
+          isHost: id === hostUid,
         };
       })
       // You first, then by name, matching the grid layout.
@@ -157,6 +274,9 @@ export class RoomsService implements OnModuleInit {
       roomId,
       vibe: vibe as Vibe,
       capacity: ROOM_CAPACITY,
+      hostUid: hostUid ?? null,
+      matching: matching === 'manual' ? 'manual' : 'auto',
+      locked: locked === '1',
       members,
       livekit: await this.livekit.connectionFor(roomId, uid, self?.displayName ?? 'Rider'),
       joinedAt: new Date(session?.currentJoinedAt ?? Date.now()).toISOString(),
@@ -165,11 +285,71 @@ export class RoomsService implements OnModuleInit {
 
   // ---------------------------------------------------------------- join / leave
 
-  async join(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
+  private async requireVerified(uid: string): Promise<void> {
     const state = await this.validation.getState(uid);
     if (state.state !== 'VERIFIED') {
       conflict('NOT_VERIFIED', 'Your trip must be verified before you can enter a R.O.O.M.');
     }
+  }
+
+  /** Host a Room: open a new public room for the mood with the rider as moderator. */
+  async host(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
+    await this.requireVerified(uid);
+    await this.leaveRoom(uid);
+    const roomId = await this.withVibeLock(vibe, async () => {
+      const id = newRoomId();
+      await this.redis
+        .multi()
+        .hset(keys.room(id), { vibe, createdAt: String(Date.now()), hostUid: uid })
+        .sadd(keys.all(vibe), id)
+        .exec();
+      await this.seat(uid, id, vibe);
+      return id;
+    });
+    return this.afterJoin(uid, roomId, vibe);
+  }
+
+  /** Join a specific room from the Discovery Grid. */
+  async joinById(uid: string, roomId: string): Promise<RoomSessionDto> {
+    if (!ROOM_ID.test(roomId)) notFound();
+    await this.requireVerified(uid);
+    const vibe = (await this.redis.hget(keys.room(roomId), 'vibe')) as Vibe | null;
+    if (!vibe) notFound();
+    if ((await this.currentRoomId(uid)) === roomId) {
+      const session = await this.buildSession(uid, roomId);
+      if (session) return session;
+    }
+    // A host invite gets past Manual matching and the Privacy Lock (never past an ejection or skip).
+    const invited = (await this.redis.exists(keys.invite(roomId, uid))) === 1;
+    // Check before leaving the current room, so a rejected join keeps the rider where they are.
+    await this.assertJoinable(uid, roomId, invited);
+    await this.leaveRoom(uid);
+    await this.withVibeLock(vibe, async () => {
+      // Re-check under the lock: the room may have filled or closed meanwhile.
+      await this.assertJoinable(uid, roomId, invited);
+      await this.seat(uid, roomId, vibe);
+    });
+    await this.redis.multi().del(keys.invite(roomId, uid)).hdel(keys.requests(roomId), uid).exec();
+    return this.afterJoin(uid, roomId, vibe);
+  }
+
+  private async assertJoinable(uid: string, roomId: string, invited = false): Promise<void> {
+    const [members, meta, ejected] = await Promise.all([
+      this.roomMembers(roomId),
+      this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+      this.redis.sismember(keys.ejected(roomId), uid),
+    ]);
+    if (ejected === 1) conflict('ROOM_UNAVAILABLE', 'The host removed you from that R.O.O.M.');
+    if (!invited && !isPublic(meta)) conflict('ROOM_PRIVATE', 'That R.O.O.M. is private right now. Pick another one.');
+    if (members.length === 0) conflict('ROOM_UNAVAILABLE', 'That R.O.O.M. just closed. Pick another one.');
+    if (members.length >= ROOM_CAPACITY) conflict('ROOM_FULL', 'That R.O.O.M. is full. Pick another one.');
+    if (await this.blockedFrom(uid, members)) {
+      conflict('ROOM_UNAVAILABLE', 'Someone you recently skipped is in that R.O.O.M.');
+    }
+  }
+
+  async join(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
+    await this.requireVerified(uid);
     const current = await this.currentRoomId(uid);
     if (current) {
       const currentVibe = await this.redis.hget(keys.room(current), 'vibe');
@@ -214,30 +394,52 @@ export class RoomsService implements OnModuleInit {
         if (candidate === excludeRoomId) continue;
         const members = await this.roomMembers(candidate);
         if (members.length === 0 || members.length >= ROOM_CAPACITY) continue;
-        const blocked = await Promise.all(members.map((m) => this.redis.exists(keys.block(uid, m))));
-        if (blocked.some((b) => b === 1)) continue;
+        if (await this.blockedFrom(uid, members)) continue;
+        if ((await this.redis.sismember(keys.ejected(candidate), uid)) === 1) continue;
         chosen = candidate;
         break;
       }
 
       if (!chosen) {
+        // The matchmaker opened this room, so its first rider hosts it.
         chosen = newRoomId();
         await this.redis
           .multi()
-          .hset(keys.room(chosen), { vibe, createdAt: String(Date.now()) })
+          .hset(keys.room(chosen), { vibe, createdAt: String(Date.now()), hostUid: uid })
           .sadd(keys.all(vibe), chosen)
           .exec();
       }
 
-      await this.redis.sadd(keys.members(chosen), uid);
-      const count = await this.redis.scard(keys.members(chosen));
-      const pipeline = this.redis.multi().set(keys.userRoom(uid), chosen, 'EX', SESSION_TTL_SEC);
-      if (count >= ROOM_CAPACITY) pipeline.zrem(keys.open(vibe), chosen);
-      else pipeline.zadd(keys.open(vibe), count, chosen);
-      await pipeline.exec();
+      await this.seat(uid, chosen, vibe);
       return chosen;
     });
 
+    return this.afterJoin(uid, roomId, vibe);
+  }
+
+  /** Adds the rider to the room's seats (call under the vibe lock). */
+  private async seat(uid: string, roomId: string, vibe: Vibe): Promise<void> {
+    await this.redis
+      .multi()
+      .sadd(keys.members(roomId), uid)
+      .hset(keys.joined(roomId), uid, String(Date.now()))
+      .exec();
+    await this.redis.set(keys.userRoom(uid), roomId, 'EX', SESSION_TTL_SEC);
+    await this.syncOpenSeats(roomId, vibe);
+  }
+
+  /** Keeps the matchmaker's open-room set in step with occupancy and the room's privacy. */
+  private async syncOpenSeats(roomId: string, vibe: Vibe): Promise<void> {
+    const [count, meta] = await Promise.all([
+      this.redis.scard(keys.members(roomId)),
+      this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+    ]);
+    if (count > 0 && count < ROOM_CAPACITY && isPublic(meta)) await this.redis.zadd(keys.open(vibe), count, roomId);
+    else await this.redis.zrem(keys.open(vibe), roomId);
+  }
+
+  /** Ride bookkeeping, session for the rider, and a join notice for the others. */
+  private async afterJoin(uid: string, roomId: string, vibe: Vibe): Promise<RoomSessionDto> {
     await this.recordJoin(uid, roomId, vibe);
     const session = await this.buildSession(uid, roomId);
     if (!session) conflict('ROOM_UNAVAILABLE', 'That R.O.O.M. closed. Please try again.');
@@ -278,7 +480,12 @@ export class RoomsService implements OnModuleInit {
     if (!roomId) return null;
     const vibe = (await this.redis.hget(keys.room(roomId), 'vibe')) as Vibe | null;
 
-    await this.redis.multi().srem(keys.members(roomId), uid).del(keys.userRoom(uid)).exec();
+    await this.redis
+      .multi()
+      .srem(keys.members(roomId), uid)
+      .hdel(keys.joined(roomId), uid)
+      .del(keys.userRoom(uid))
+      .exec();
     const remaining = await this.roomMembers(roomId);
     if (vibe) {
       if (remaining.length === 0) {
@@ -286,10 +493,18 @@ export class RoomsService implements OnModuleInit {
           .multi()
           .zrem(keys.open(vibe), roomId)
           .srem(keys.all(vibe), roomId)
-          .del(keys.room(roomId), keys.members(roomId), `room:${roomId}:chat`)
+          .del(
+            keys.room(roomId),
+            keys.members(roomId),
+            keys.joined(roomId),
+            keys.ejected(roomId),
+            keys.requests(roomId),
+            `room:${roomId}:chat`,
+          )
           .exec();
       } else {
-        await this.redis.zadd(keys.open(vibe), remaining.length, roomId);
+        await this.syncOpenSeats(roomId, vibe);
+        await this.handOverHost(roomId, uid, remaining);
       }
     }
 
@@ -303,6 +518,215 @@ export class RoomsService implements OnModuleInit {
     this.realtime.emitToUsers(remaining, ServerEvents.ROOM_MEMBER_LEFT, { roomId, uid });
     await this.livekit.remove(roomId, uid);
     return roomId;
+  }
+
+  /** When the host leaves, the longest-present rider becomes host. */
+  private async handOverHost(roomId: string, leftUid: string, remaining: string[]): Promise<void> {
+    const hostUid = await this.redis.hget(keys.room(roomId), 'hostUid');
+    if (hostUid && hostUid !== leftUid && remaining.includes(hostUid)) return;
+    const joined = await this.redis.hgetall(keys.joined(roomId));
+    const next = [...remaining].sort((a, b) => Number(joined[a] ?? Infinity) - Number(joined[b] ?? Infinity))[0]!;
+    await this.redis.hset(keys.room(roomId), 'hostUid', next);
+    this.realtime.emitToUsers(remaining, ServerEvents.ROOM_HOST_CHANGED, { roomId, hostUid: next });
+  }
+
+  // ---------------------------------------------------------------- host moderation
+
+  /** The caller must be the host of their current room. */
+  private async requireHost(uid: string): Promise<{ roomId: string; meta: RoomMeta; members: string[] }> {
+    const roomId = await this.currentRoomId(uid);
+    if (!roomId) conflict('NOT_IN_ROOM', 'You are not in a R.O.O.M.');
+    const [meta, members] = await Promise.all([
+      this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+      this.roomMembers(roomId),
+    ]);
+    if (meta.hostUid !== uid) forbidden('NOT_HOST', 'Only the host can do that.');
+    return { roomId, meta, members };
+  }
+
+  /** Host + a target rider in the same room (never the host themselves). */
+  async requireHostOf(uid: string, target: string): Promise<string> {
+    const { roomId, members } = await this.requireHost(uid);
+    if (target === uid || !members.includes(target)) memberNotFound();
+    return roomId;
+  }
+
+  /** Eject: out of the room and video, and kept out of this room for its lifetime. The ride goes on. */
+  async eject(uid: string, target: string): Promise<{ ok: true }> {
+    const roomId = await this.requireHostOf(uid, target);
+    await this.redis.multi().sadd(keys.ejected(roomId), target).expire(keys.ejected(roomId), SESSION_TTL_SEC).exec();
+    await this.leaveRoom(target);
+    this.realtime.emitToUser(target, ServerEvents.ROOM_EJECTED, { roomId, message: EJECTED_MESSAGE });
+    this.logger.log(`Host ${uid} ejected ${target} from ${roomId}`);
+    return { ok: true };
+  }
+
+  /** Force-mute: server-side mute on the video server plus a notice to the rider. */
+  async forceMute(uid: string, target: string): Promise<{ ok: true }> {
+    const roomId = await this.requireHostOf(uid, target);
+    await this.livekit.muteMicrophone(roomId, target);
+    this.realtime.emitToUser(target, ServerEvents.FORCE_MUTED, { roomId, message: FORCE_MUTED_MESSAGE });
+    return { ok: true };
+  }
+
+  /** Mood shift, automatic/manual matching and privacy lock. */
+  async updateSettings(
+    uid: string,
+    update: { vibe?: Vibe; matching?: RoomMatching; locked?: boolean },
+  ): Promise<RoomSessionDto> {
+    const { roomId, meta, members } = await this.requireHost(uid);
+    const oldVibe = meta.vibe as Vibe;
+    const vibe = update.vibe ?? oldVibe;
+
+    if (vibe !== oldVibe) {
+      // Move the room from the old mood's pool to the new one.
+      await this.withVibeLock(oldVibe, () =>
+        this.redis.multi().zrem(keys.open(oldVibe), roomId).srem(keys.all(oldVibe), roomId).exec(),
+      );
+    }
+    const fields: Record<string, string> = { vibe };
+    if (update.matching) fields.matching = update.matching;
+    if (update.locked != null) fields.locked = update.locked ? '1' : '0';
+    await this.withVibeLock(vibe, async () => {
+      await this.redis.multi().hset(keys.room(roomId), fields).sadd(keys.all(vibe), roomId).exec();
+      await this.syncOpenSeats(roomId, vibe);
+    });
+
+    const session = await this.buildSession(uid, roomId);
+    if (!session) conflict('ROOM_UNAVAILABLE', 'That R.O.O.M. closed.');
+    this.realtime.emitToUsers(members, ServerEvents.ROOM_SETTINGS_CHANGED, {
+      roomId,
+      vibe: session.vibe,
+      matching: session.matching,
+      locked: session.locked,
+    });
+    return session;
+  }
+
+  // ---------------------------------------------------------------- friends: live rooms, invites, requests
+
+  /** Current room for each rider (only riders in a room are in the map). */
+  async liveRooms(uids: string[]): Promise<Map<string, LiveRoomDto>> {
+    const result = new Map<string, LiveRoomDto>();
+    await Promise.all(
+      uids.map(async (uid) => {
+        const roomId = await this.currentRoomId(uid);
+        if (!roomId) return;
+        const [meta, count] = await Promise.all([
+          this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+          this.redis.scard(keys.members(roomId)),
+        ]);
+        if (!meta.vibe || count === 0) return;
+        result.set(uid, {
+          roomId,
+          vibe: meta.vibe as Vibe,
+          isHost: meta.hostUid === uid,
+          memberCount: count,
+          capacity: ROOM_CAPACITY,
+          open: isPublic(meta) && count < ROOM_CAPACITY,
+        });
+      }),
+    );
+    return result;
+  }
+
+  /** Host of a room (404 when the room is gone). */
+  async hostOf(roomId: string): Promise<string> {
+    if (!ROOM_ID.test(roomId)) notFound();
+    const hostUid = await this.redis.hget(keys.room(roomId), 'hostUid');
+    if (!hostUid) notFound();
+    return hostUid;
+  }
+
+  private async hostCard(uid: string): Promise<RoomHostDto> {
+    const p = (await this.profiles.getMany([uid])).get(uid);
+    return { uid, displayName: p?.displayName ?? 'Rider', homeCity: p?.homeCity ?? null, photoUrl: p?.photoUrl ?? null };
+  }
+
+  /** Host invite: valid for 10 minutes, gets past Manual / Privacy Lock. Network check is the caller's. */
+  async invite(uid: string, target: string, opts: { viaRequest?: boolean } = {}): Promise<{ ok: true }> {
+    const { roomId, meta, members } = await this.requireHost(uid);
+    if (target === uid || members.includes(target)) conflict('ALREADY_IN_ROOM', 'That rider is already in your R.O.O.M.');
+    if ((await this.redis.sismember(keys.ejected(roomId), target)) === 1) {
+      conflict('ROOM_UNAVAILABLE', 'You removed that rider from this R.O.O.M.');
+    }
+    await this.redis
+      .multi()
+      .set(keys.invite(roomId, target), uid, 'EX', INVITE_TTL_SEC)
+      .hdel(keys.requests(roomId), target)
+      .exec();
+    this.realtime.emitToUser(target, ServerEvents.ROOM_INVITE, {
+      roomId,
+      vibe: meta.vibe,
+      from: await this.hostCard(uid),
+      viaRequest: opts.viaRequest === true,
+      expiresAt: new Date(Date.now() + INVITE_TTL_SEC * 1000).toISOString(),
+    });
+    return { ok: true };
+  }
+
+  /** A friend asks a private room for a seat (friendship is checked by the caller). */
+  async requestToJoin(uid: string, roomId: string): Promise<{ ok: true }> {
+    await this.requireVerified(uid);
+    const [meta, members, ejected] = await Promise.all([
+      this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
+      this.roomMembers(roomId),
+      this.redis.sismember(keys.ejected(roomId), uid),
+    ]);
+    if (!meta.vibe || !meta.hostUid || members.length === 0) notFound();
+    if (members.includes(uid)) conflict('ALREADY_IN_ROOM', 'You are already in that R.O.O.M.');
+    if (isPublic(meta)) conflict('ROOM_PUBLIC', 'That R.O.O.M. is open — just join it.');
+    if (ejected === 1) conflict('ROOM_UNAVAILABLE', 'The host removed you from that R.O.O.M.');
+    if (members.length >= ROOM_CAPACITY) conflict('ROOM_FULL', 'That R.O.O.M. is full.');
+    if (await this.blockedFrom(uid, members)) conflict('ROOM_UNAVAILABLE', 'Someone you recently skipped is in that R.O.O.M.');
+    await this.redis
+      .multi()
+      .hset(keys.requests(roomId), uid, String(Date.now()))
+      .expire(keys.requests(roomId), INVITE_TTL_SEC)
+      .exec();
+    this.realtime.emitToUser(meta.hostUid, ServerEvents.ROOM_JOIN_REQUEST, { roomId, requester: await this.hostCard(uid) });
+    return { ok: true };
+  }
+
+  async listRequests(uid: string): Promise<{ requests: { user: RoomHostDto; requestedAt: string }[] }> {
+    const { roomId } = await this.requireHost(uid);
+    const raw = await this.redis.hgetall(keys.requests(roomId));
+    const cutoff = Date.now() - INVITE_TTL_SEC * 1000;
+    const pending = Object.entries(raw)
+      .map(([id, at]) => ({ id, at: Number(at) }))
+      .filter((r) => r.at >= cutoff)
+      .sort((a, b) => a.at - b.at);
+    const profiles = await this.profiles.getMany(pending.map((r) => r.id));
+    return {
+      requests: pending.map(({ id, at }) => {
+        const p = profiles.get(id);
+        return {
+          user: { uid: id, displayName: p?.displayName ?? 'Rider', homeCity: p?.homeCity ?? null, photoUrl: p?.photoUrl ?? null },
+          requestedAt: new Date(at).toISOString(),
+        };
+      }),
+    };
+  }
+
+  async acceptRequest(uid: string, requester: string): Promise<{ ok: true }> {
+    const { roomId } = await this.requireHost(uid);
+    if (!(await this.redis.hexists(keys.requests(roomId), requester))) {
+      const body: ErrorResponseBody = { code: 'REQUEST_NOT_FOUND', message: 'That request expired or was withdrawn.' };
+      throw new NotFoundException(body);
+    }
+    return this.invite(uid, requester, { viaRequest: true });
+  }
+
+  async declineRequest(uid: string, requester: string): Promise<{ ok: true }> {
+    const { roomId } = await this.requireHost(uid);
+    const removed = await this.redis.hdel(keys.requests(roomId), requester);
+    if (removed > 0) {
+      this.realtime.emitToUser(requester, ServerEvents.ROOM_REQUEST_DECLINED, {
+        roomId,
+        message: "The host couldn't fit you in this time.",
+      });
+    }
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------- ride end

@@ -9,6 +9,9 @@
  * OpenAPI spec version: 0.3.0
  */
 
+/**
+ * POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.
+ */
 export type ValidationState = typeof ValidationState[keyof typeof ValidationState];
 
 
@@ -16,5 +19,6 @@ export const ValidationState = {
   PENDING: 'PENDING',
   VERIFIED: 'VERIFIED',
   GRACE: 'GRACE',
+  POST_RIDE: 'POST_RIDE',
   TERMINATED: 'TERMINATED',
 } as const;

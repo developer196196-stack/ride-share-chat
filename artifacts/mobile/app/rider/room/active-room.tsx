@@ -1,15 +1,22 @@
 /**
  * Sleek 10 — Active R.O.O.M.
- * LiveKit video grid, translated chat overlay, grace countdown, Next (Instant Escape),
- * report, safety shield and hang up.
+ * LiveKit video grid, translated chat overlay, grace and post-ride countdowns, Next (Instant Escape),
+ * report, safety shield and hang up. The host also gets the Moderation Toolkit (client doc 3):
+ * long-press a tile to Eject / Force-Mute / Silent Flag, tap the mood pill for Dynamic Mood
+ * Shifting, and the moderator panel for automatic/manual matching and the Privacy Lock.
  */
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  ejectMember,
+  flagMember,
   getCurrentRoom,
   getGetPreferencesQueryKey,
   listRoomMessages,
+  muteMember,
+  updateRoomSettings,
+  type RoomSettingsUpdate,
   useGetPreferences,
   useLeaveRoom,
   type ChatMessage,
@@ -18,13 +25,15 @@ import { colors, withAlpha } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
 import { radius, shadow, tintedShadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { VIBE_OPTIONS, vibeOption } from '@/constants/vibes';
 import { fonts, textSize } from '@/constants/typography';
 import { ErrorBanner, Icon, LiveDot, Screen } from '@/components/ui';
 import { ChatOverlay } from '@/components/room/ChatOverlay';
 import { ReportSheet } from '@/components/room/ReportSheet';
-import { VideoRoom, type MediaControls } from '@/components/room/VideoRoom';
+import { VideoRoom, type MediaControls, type ModerationAction, type VideoEndReason } from '@/components/room/VideoRoom';
 import { SafetyFab } from '@/components/safety/SafetyFab';
+import { FocusFollow } from '@/components/social/FocusFollow';
+import { InviteSheet, RequestsSheet } from '@/components/social/HostSheets';
 import { formatCountdown, useGraceCountdown } from '@/hooks/use-grace-countdown';
 import { getApiErrorMessage } from '@/lib/api/error-message';
 import { ClientEvents } from '@/lib/realtime/events';
@@ -72,8 +81,15 @@ export default function ActiveRoomScreen() {
   const leave = useLeaveRoom();
   const [reportOpen, setReportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moodsOpen, setMoodsOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [requestsOpen, setRequestsOpen] = useState(false);
+  const newRequests = useTripStore((s) => s.newRequests);
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   const graceLeft = useGraceCountdown(snapshot?.state === 'GRACE' ? snapshot.graceDeadline : null);
+  // Post-ride extension: the rider has left the vehicle; the room stays live until the timer ends.
+  const postRideLeft = useGraceCountdown(snapshot?.state === 'POST_RIDE' ? snapshot.postRideDeadline : null);
 
   // Restore the session (app reopened) and load recent chat.
   useEffect(() => {
@@ -84,7 +100,7 @@ export default function ActiveRoomScreen() {
           const current = await getCurrentRoom();
           if (cancelled) return;
           if (!current.room) {
-            router.replace(routes.vibeSelection);
+            router.replace(routes.discover);
             return;
           }
           useTripStore.getState().setRoom(current.room);
@@ -103,6 +119,78 @@ export default function ActiveRoomScreen() {
   const send = async (text: string) => {
     const message = await emitWithAck<ChatMessage>(ClientEvents.CHAT_MESSAGE_SENT, { text });
     useTripStore.getState().addMessage(message);
+  };
+
+  /** Host: eject / force-mute / silent flag; errors keep the tile menu open to retry. */
+  const moderate = async (target: string, action: ModerationAction) => {
+    const name = useTripStore.getState().room?.members.find((m) => m.uid === target)?.displayName ?? 'Rider';
+    setError(null);
+    try {
+      if (action === 'eject') {
+        await ejectMember(target);
+        useTripStore.getState().setNotice({ message: `${name} was removed from the room.` });
+      } else if (action === 'mute') {
+        await muteMember(target);
+        useTripStore.getState().setNotice({ message: `${name} is muted. They can unmute later.` });
+      } else {
+        await flagMember(target, {});
+        useTripStore.getState().setNotice({ message: `Flag sent to Trust & Safety. ${name} isn't notified.` });
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'That host action failed. Try again.'));
+      throw err;
+    }
+  };
+
+  /** Host: mood shift, matching mode, privacy lock. Patches the room in place (no video reconnect). */
+  const applySettings = async (update: RoomSettingsUpdate) => {
+    const roomId = useTripStore.getState().room?.roomId;
+    if (!roomId || settingsBusy) return;
+    setError(null);
+    setSettingsBusy(true);
+    try {
+      const session = await updateRoomSettings(update);
+      useTripStore.getState().setRoomSettings(roomId, {
+        vibe: session.vibe,
+        matching: session.matching,
+        locked: session.locked,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not update the room.'));
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
+  /**
+   * LiveKit says this device's video ended for good (removed, same account elsewhere, room gone).
+   * Hang up, Next, ejection and ride termination already handle themselves, so only act when the
+   * room is still the current one. Never follow the account into another room automatically: that
+   * would kick the other device and the two would bounce back and forth.
+   */
+  const videoEnded = async (reason: VideoEndReason) => {
+    const roomId = useTripStore.getState().room?.roomId;
+    if (!roomId) return;
+    let current: Awaited<ReturnType<typeof getCurrentRoom>>['room'] = null;
+    try {
+      current = (await getCurrentRoom()).room;
+    } catch {
+      return;
+    }
+    const store = useTripStore.getState();
+    if (store.room?.roomId !== roomId || store.termination) return;
+    if (current?.roomId === roomId) {
+      if (reason === 'duplicate') {
+        store.setNotice({ message: 'Your account joined this room on another device, so video moved there.', tone: 'warning' });
+      }
+      return;
+    }
+    router.replace(routes.discover);
+    store.setRoom(null);
+    store.setNotice({
+      message: current ? 'Your account joined another R.O.O.M. on another device.' : "You're no longer in this R.O.O.M.",
+      tone: 'warning',
+    });
   };
 
   const hangUp = async () => {
@@ -126,15 +214,36 @@ export default function ActiveRoomScreen() {
 
   const vibe = vibeOption(room.vibe);
   const inGrace = snapshot?.state === 'GRACE';
+  const postRide = snapshot?.state === 'POST_RIDE';
+  const isHost = room.hostUid != null && room.hostUid === uid;
+  const closed = room.locked || room.matching === 'manual';
 
   return (
     <View style={styles.root}>
       <Screen spaceBetween scroll={false} contentStyle={styles.content}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.modePill}>
-              <Text style={styles.modePillText}>{vibe.label}</Text>
-            </View>
+            <Pressable
+              disabled={!isHost}
+              onPress={() => setMoodsOpen((open) => !open)}
+              style={[styles.modePill, { backgroundColor: vibe.color }]}
+              accessibilityRole={isHost ? 'button' : undefined}
+              accessibilityLabel={isHost ? `Mood ${vibe.label}. Tap to shift the room's mood` : `Mood ${vibe.label}`}
+            >
+              <Text style={styles.modePillText}>#{vibe.label.replace(/\s+/g, '')}</Text>
+              {isHost ? <Icon name="solarAltArrowDownLinear" size={12} color={colors.primaryForeground} /> : null}
+            </Pressable>
+            {closed ? (
+              <View style={styles.privatePill}>
+                <Icon name="solarLockKeyholeBold" size={11} color={colors.mutedForeground} />
+                <Text style={styles.privatePillText}>Private</Text>
+              </View>
+            ) : null}
+            {room.hostUid != null && room.hostUid === uid ? (
+              <View style={styles.hostPill} accessibilityLabel="You are the host of this R.O.O.M.">
+                <Text style={styles.hostPillText}>You're hosting</Text>
+              </View>
+            ) : null}
             <View style={styles.transit}>
               <LiveDot />
               <Text style={styles.transitText}>
@@ -149,12 +258,47 @@ export default function ActiveRoomScreen() {
                 <Text style={styles.graceChipText}>Grace: {formatCountdown(graceLeft)}</Text>
               </Pressable>
             ) : null}
-            <Pressable style={styles.nextRoom} onPress={() => router.push(routes.fastTrack)} accessibilityLabel="Next room">
-              <Icon name="solarForwardBold" size={14} color={colors.primaryForeground} />
-              <Text style={styles.nextRoomText}>Next Room</Text>
-            </Pressable>
+            {postRide ? (
+              <View
+                style={styles.postRideChip}
+                accessibilityLabel={`Ride ended. Your R.O.O.M. stays live for ${formatCountdown(postRideLeft)}`}
+              >
+                <Icon name="solarHourglassLineBold" size={14} color={colors.accent} />
+                <Text style={styles.postRideChipText}>Ride ended · {formatCountdown(postRideLeft)}</Text>
+              </View>
+            ) : (
+              <Pressable style={styles.nextRoom} onPress={() => router.push(routes.fastTrack)} accessibilityLabel="Next room">
+                <Icon name="solarForwardBold" size={14} color={colors.primaryForeground} />
+                <Text style={styles.nextRoomText}>Next Room</Text>
+              </Pressable>
+            )}
+            <SafetyFab inline />
           </View>
         </View>
+
+        {isHost && moodsOpen ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moods} contentContainerStyle={styles.moodsContent}>
+            {VIBE_OPTIONS.map((option) => {
+              const active = option.value === room.vibe;
+              return (
+                <Pressable
+                  key={option.value}
+                  disabled={active || settingsBusy}
+                  onPress={() => {
+                    setMoodsOpen(false);
+                    void applySettings({ vibe: option.value });
+                  }}
+                  style={[styles.moodChip, { borderColor: option.color }, active && { backgroundColor: option.color }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Icon name={option.icon} size={14} color={active ? colors.white : option.color} />
+                  <Text style={[styles.moodChipText, active && { color: colors.white }]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
 
         {error ? <ErrorBanner message={error} style={styles.banner} /> : null}
 
@@ -162,9 +306,12 @@ export default function ActiveRoomScreen() {
           <VideoRoom
             session={room}
             onVideoError={(message) => setError(`Video: ${message}`)}
+            onVideoEnded={(reason) => void videoEnded(reason)}
+            moderation={isHost ? { onAction: moderate } : undefined}
+            renderFocusActions={(member) => <FocusFollow uid={member.uid} />}
             renderControls={(media: MediaControls) => (
               <>
-                <View style={styles.chatWrap} pointerEvents="box-none">
+                <View style={[styles.chatWrap, isHost && styles.chatWrapHost]} pointerEvents="box-none">
                   <ChatOverlay
                     messages={messages}
                     selfUid={uid}
@@ -173,6 +320,78 @@ export default function ActiveRoomScreen() {
                     subtitleStyle={prefs.data?.subtitleStyle}
                   />
                 </View>
+                {isHost ? (
+                  <View style={styles.modPanel}>
+                    <Text style={styles.modLabel}>Host</Text>
+                    <View style={styles.segment} accessibilityRole="radiogroup">
+                      {(['auto', 'manual'] as const).map((mode) => {
+                        const active = room.matching === mode;
+                        return (
+                          <Pressable
+                            key={mode}
+                            disabled={active || settingsBusy}
+                            onPress={() => void applySettings({ matching: mode })}
+                            style={[styles.segmentItem, active && styles.segmentActive]}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: active }}
+                            accessibilityLabel={mode === 'auto' ? 'Automated matching' : 'Manual control'}
+                          >
+                            <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                              {mode === 'auto' ? 'Auto-fill' : 'Manual'}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Pressable
+                      disabled={settingsBusy}
+                      onPress={() => void applySettings({ locked: !room.locked })}
+                      style={[styles.lockButton, room.locked && styles.lockButtonOn]}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: room.locked }}
+                      accessibilityLabel="Privacy lock"
+                    >
+                      {settingsBusy ? (
+                        <ActivityIndicator size="small" color={room.locked ? colors.white : colors.foreground} />
+                      ) : (
+                        <Icon
+                          name={room.locked ? 'solarLockKeyholeBold' : 'solarLockKeyholeLinear'}
+                          size={16}
+                          color={room.locked ? colors.white : colors.foreground}
+                        />
+                      )}
+                      <Text style={[styles.lockText, room.locked && { color: colors.white }]}>{room.locked ? 'Locked' : 'Lock'}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setInviteOpen(true)}
+                      style={styles.textPill}
+                      accessibilityRole="button"
+                      accessibilityLabel="Invite friends"
+                    >
+                      <Icon name="solarUsersGroupRoundedBold" size={14} color={colors.foreground} />
+                      <Text style={styles.textPillLabel}>Invite</Text>
+                    </Pressable>
+                    {closed || newRequests > 0 ? (
+                      <Pressable
+                        onPress={() => {
+                          useTripStore.getState().setNewRequests(0);
+                          setRequestsOpen(true);
+                        }}
+                        style={styles.textPill}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Join requests${newRequests > 0 ? `, ${newRequests} new` : ''}`}
+                      >
+                        <Icon name="solarLogin2Bold" size={14} color={colors.foreground} />
+                        <Text style={styles.textPillLabel}>Requests</Text>
+                        {newRequests > 0 ? (
+                          <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{newRequests}</Text>
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
                 <View style={styles.controls}>
                   <View style={styles.controlsLeft}>
                     <ControlButton
@@ -206,7 +425,12 @@ export default function ActiveRoomScreen() {
           />
         </View>
       </Screen>
-      <SafetyFab style={styles.fab} />
+      {isHost ? (
+        <>
+          <InviteSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} memberUids={room.members.map((m) => m.uid)} />
+          <RequestsSheet visible={requestsOpen} onClose={() => setRequestsOpen(false)} />
+        </>
+      ) : null}
       <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} roomId={room.roomId} members={room.members} />
     </View>
   );
@@ -219,8 +443,106 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12, gap: 8 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  modePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.primary },
+  modePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  privatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.secondary,
+  },
+  privatePillText: { ...textSize['11'], fontFamily: fonts.sans.semibold, color: colors.mutedForeground },
+  moods: { flexGrow: 0, marginBottom: 10 },
+  moodsContent: { gap: 8 },
+  moodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    backgroundColor: colors.card,
+  },
+  moodChipText: { ...textSize.xs, fontFamily: fonts.sans.bold, color: colors.foreground },
+  modPanel: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modLabel: { ...textSize['11'], fontFamily: fonts.sans.bold, color: colors.mutedForeground, textTransform: 'uppercase' },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: radius.full,
+    backgroundColor: colors.secondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: radius.full },
+  segmentActive: { backgroundColor: colors.card, ...shadow.sm },
+  segmentText: { ...textSize.xs, fontFamily: fonts.sans.semibold, color: colors.mutedForeground },
+  segmentTextActive: { color: colors.foreground, fontFamily: fonts.sans.bold },
+  lockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  lockButtonOn: { backgroundColor: colors.foreground, borderColor: colors.foreground },
+  lockText: { ...textSize.xs, fontFamily: fonts.sans.bold, color: colors.foreground },
+  textPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 34,
+    paddingHorizontal: 10,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  textPillLabel: { ...textSize.xs, fontFamily: fonts.sans.bold, color: colors.foreground },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { ...textSize['10'], fontFamily: fonts.sans.bold, color: colors.primaryForeground },
   modePillText: { ...textSize.xs, fontFamily: fonts.sans.bold, color: colors.primaryForeground },
+  hostPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  hostPillText: { ...textSize.xs, fontFamily: fonts.sans.bold, color: colors.foreground },
   transit: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   transitText: { ...textSize.xs, fontFamily: fonts.sans.medium, color: colors.mutedForeground },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -236,6 +558,18 @@ const styles = StyleSheet.create({
     backgroundColor: withAlpha(colors.chart3, 0.1),
   },
   graceChipText: { ...textSize.xs, fontFamily: fonts.mono.bold, color: colors.chart3 },
+  postRideChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.accent, 0.3),
+    backgroundColor: withAlpha(colors.accent, 0.1),
+  },
+  postRideChipText: { ...textSize.xs, fontFamily: fonts.mono.bold, color: colors.accent },
   nextRoom: {
     height: 32,
     paddingHorizontal: 12,
@@ -250,6 +584,8 @@ const styles = StyleSheet.create({
   banner: { marginBottom: 8 },
   stage: { flex: 1 },
   chatWrap: { position: 'absolute', left: 0, right: 0, bottom: 64 },
+  // The moderator panel adds a row above the controls.
+  chatWrapHost: { bottom: 108 },
   controls: {
     marginTop: 12,
     paddingTop: 8,
@@ -295,5 +631,4 @@ const styles = StyleSheet.create({
     ...tintedShadow(colors.destructive, 0.25, 'md'),
   },
   hangUpIcon: { transform: [{ rotate: '135deg' }] },
-  fab: { bottom: 92 },
 });
