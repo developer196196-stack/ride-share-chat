@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Header, HttpCode, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { DecodedIdToken } from '@workspace/firebase';
-import { CreateReportBody, CreateSafetyAlertBody, CreateShareLinkBody } from '@workspace/api-zod';
+import { CreateReportBody, CreateSafetyAlertBody, CreateShareLinkBody, FlagMemberBody } from '@workspace/api-zod';
 import { parseBody } from '../common/zod-parse';
 import { resolvePublicBaseUrl } from '../common/public-base-url';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { RoomsService } from '../rooms/rooms.service';
 import { ReportsService } from './reports.service';
 import { SafetyService } from './safety.service';
 import { renderSharePage } from './share-page';
@@ -19,6 +20,7 @@ export class SafetyController {
   constructor(
     private readonly safety: SafetyService,
     private readonly reports: ReportsService,
+    private readonly rooms: RoomsService,
   ) {}
 
   @Post('safety/share-links')
@@ -46,6 +48,22 @@ export class SafetyController {
   @Get('public/share/:token')
   publicShare(@Param('token') token: string) {
     return this.safety.getPublic(token);
+  }
+
+  /** Host Silent Flag: invisible to the flagged rider (the 15-second clip comes with Trust & Safety). */
+  @Post('rooms/current/members/:uid/flag')
+  @UseGuards(FirebaseAuthGuard)
+  @HttpCode(200)
+  async flag(@Req() req: AuthedRequest, @Param('uid') uid: string, @Body() body: unknown) {
+    const { note } = parseBody(FlagMemberBody, body ?? {});
+    const roomId = await this.rooms.requireHostOf(req.user!.uid, uid);
+    return this.reports.create(req.user!.uid, {
+      roomId,
+      reportedUid: uid,
+      reason: 'host_flag',
+      details: note ?? null,
+      source: 'host_flag',
+    });
   }
 
   @Post('reports')

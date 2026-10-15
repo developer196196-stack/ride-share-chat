@@ -24,6 +24,13 @@ export interface ValidationSnapshot {
   graceDeadline: Date | null;
   /** @nullable */
   graceRemainingSec: number | null;
+  /**
+     * End of the post-ride extension (POST_RIDE only)
+     * @nullable
+     */
+  postRideDeadline: Date | null;
+  /** @nullable */
+  postRideRemainingSec: number | null;
   /** @nullable */
   terminationReason: ValidationSnapshotTerminationReason;
   /** Active engine thresholds (configurable on the server via VALIDATION_* env) */

@@ -32,6 +32,8 @@ import { AuthProvider } from '@/providers/AuthProvider';
 import { RealtimeProvider } from '@/providers/RealtimeProvider';
 import { TripSessionHost } from '@/providers/TripSessionHost';
 import { SharePrompt } from '@/components/safety/SharePrompt';
+import { NoticeToast } from '@/components/room/NoticeToast';
+import { RoomInvitePrompt } from '@/components/social/RoomInvitePrompt';
 
 // Keep the native splash up until fonts are ready.
 SplashScreen.preventAutoHideAsync();
@@ -84,6 +86,8 @@ export default function RootLayout() {
               </Stack>
               <TripSessionHost />
               <SharePrompt />
+              <RoomInvitePrompt />
+              <NoticeToast />
             </GestureHandlerRootView>
             </RealtimeProvider>
           </ApiProvider>

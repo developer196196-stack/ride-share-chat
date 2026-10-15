@@ -20,7 +20,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run check:mobile` — typecheck the mobile app
 - `pnpm run build:apk` / `pnpm run build:ios` — EAS preview builds (run `eas init` in `artifacts/mobile` once to link an Expo project)
 - The app opens on the splash screen. Set `EXPO_PUBLIC_SHOW_SLEEK_SCREENS=true` (dev only) to open on the Sleek screen catalogue instead.
-- Live: Authentication (4), Profile Setup (5), Rideshare Connect (6, platform picker), Permissions (7), Trip Validation (8), Vibe Selection (9), Active R.O.O.M. (10: LiveKit video + translated chat), Ride Summary (11), Traffic Grace (12), Fast-Track / Next (13), Connections ride history (14), Settings (15), plus Language & Translation and Safety & Trusted Contacts.
+- Live: Authentication (4), Profile Setup (5), Rideshare Connect (6, platform picker), Permissions (7), Trip Validation (8), Discovery Grid (home: 3×3 live rooms, Host a Room / Join a Room), Vibe Selection (9, quick match by mood), Active R.O.O.M. (10: LiveKit video + translated chat; host toolkit: long-press Eject / Force-Mute / Silent Flag, mood shift, Auto-fill / Manual, Privacy Lock), Ride Summary (11), Traffic Grace (12), Fast-Track / Next (13), Connections ride history (14), Settings (15), plus Language & Translation, Safety & Trusted Contacts and Friends & Followers (follow system; friends = mutual follows see each other riding now; invites and join requests for Manual/locked rooms).
 - Video, sensors and in-vehicle detection need a development build (`eas build --profile development`); Expo Go and web fall back to avatar tiles and no OS activity.
 - Dev ride simulator: `EXPO_PUBLIC_ALLOW_SIMULATED_RIDE=true` (app) + `VALIDATION_ALLOW_SIMULATED=true` (API).
 

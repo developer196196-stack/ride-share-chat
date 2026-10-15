@@ -50,7 +50,7 @@ export default function ConnectionsScreen() {
               icon="solarArrowLeftLinear"
               shape="rounded"
               color={colors.foreground}
-              onPress={() => (router.canGoBack() ? router.back() : router.replace(routes.vibeSelection))}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace(routes.discover))}
             />
             <View>
               <Text style={styles.title}>Connections & Trips</Text>
@@ -129,7 +129,7 @@ export default function ConnectionsScreen() {
           height={48}
           borderRadius={radius.xl}
           size="xs"
-          onPress={() => router.push(routes.validation)}
+          onPress={() => router.push(routes.discover)}
         />
       </View>
     </Screen>

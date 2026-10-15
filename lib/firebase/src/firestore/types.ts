@@ -69,6 +69,8 @@ export type ReportDoc = {
   roomId: string | null;
   reason: string;
   details: string | null;
+  /** rider_report = Report button; host_flag = the room host's silent flag. Missing on older reports. */
+  source?: 'rider_report' | 'host_flag';
   /** Recent room chat for moderator context. */
   recentMessages: { senderId: string; text: string; sentAt: string }[];
   status: 'open' | 'reviewed';

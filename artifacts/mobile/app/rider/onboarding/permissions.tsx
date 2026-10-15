@@ -75,7 +75,7 @@ export default function PermissionsScreen() {
         return;
       }
       await markPermissionsDone();
-      router.push(routes.validation);
+      router.replace(routes.discover);
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,5 @@
 import type { RideStyle, Vibe } from '@workspace/api-client-react';
+import { colors } from './colors';
 import type { IconName } from './icons';
 
 /** R.O.O.M. vibes — values match OpenAPI `Vibe`. */
@@ -9,6 +10,8 @@ export const VIBE_OPTIONS: {
   icon: IconName;
   description: string;
   tag: string;
+  /** Mood accent, e.g. the speaking border in a R.O.O.M. */
+  color: string;
 }[] = [
   {
     value: 'party_mode',
@@ -17,6 +20,7 @@ export const VIBE_OPTIONS: {
     icon: 'solarCupMusicBold',
     description: 'Weekend vibes, music recommendations, and fun fast banter.',
     tag: '⚡ High Energy',
+    color: colors.pink600,
   },
   {
     value: 'networking',
@@ -25,6 +29,7 @@ export const VIBE_OPTIONS: {
     icon: 'mdiBriefcase',
     description: 'Founders, creatives, and tech operators sharing ride-time ideas.',
     tag: '💼 Professional',
+    color: colors.blue500,
   },
   {
     value: 'deep_talks',
@@ -33,6 +38,7 @@ export const VIBE_OPTIONS: {
     icon: 'solarMoonStarsBold',
     description: 'Late-night musings, unfiltered advice, and meaningful dialogue.',
     tag: '🌌 Chill & real',
+    color: colors.chart3,
   },
   {
     value: 'just_chilling',
@@ -41,6 +47,7 @@ export const VIBE_OPTIONS: {
     icon: 'solarSofa2Bold',
     description: 'Casual background presence with zero social pressure.',
     tag: '🎧 Low-key',
+    color: colors.accent,
   },
 ];
 

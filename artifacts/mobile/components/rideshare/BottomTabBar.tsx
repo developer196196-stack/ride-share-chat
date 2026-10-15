@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, withAlpha } from '@/constants/colors';
 import { MAX_CONTENT_WIDTH } from '@/constants/layout';
@@ -12,14 +12,15 @@ import { routes } from '@/constants/routes';
 type Tab = 'home' | 'history' | 'settings';
 
 const TABS: { key: Tab; label: string; icon: IconName; activeIcon: IconName; href: string }[] = [
-  { key: 'home', label: 'Home', icon: 'solarHomeSmileBold', activeIcon: 'solarHomeSmileBold', href: routes.vibeSelection },
+  { key: 'home', label: 'Home', icon: 'solarHomeSmileBold', activeIcon: 'solarHomeSmileBold', href: routes.discover },
   { key: 'history', label: 'History', icon: 'solarHistoryLinear', activeIcon: 'solarHistoryLinear', href: routes.connections },
   { key: 'settings', label: 'Settings', icon: 'solarSettingsLinear', activeIcon: 'solarSettingsLinear', href: routes.settings },
 ];
 
-/** Fixed bottom nav from the Vibe Selection screen (Home · History · Settings). */
+/** Fixed bottom nav (Home = Discovery Grid · History · Settings). */
 export function BottomTabBar({ active }: { active: Tab }) {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
   return (
@@ -33,7 +34,8 @@ export function BottomTabBar({ active }: { active: Tab }) {
               key={tab.key}
               style={styles.tab}
               onPress={() => {
-                if (!isActive) router.push(tab.href as never);
+                // Home is also highlighted on Trip Validation, so it still navigates from there.
+                if (pathname !== tab.href) router.push(tab.href as never);
               }}
             >
               <Icon name={isActive ? tab.activeIcon : tab.icon} size={20} color={color} />

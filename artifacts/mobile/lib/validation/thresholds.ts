@@ -8,6 +8,7 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   entrySustainSec: 5,
   graceMph: 5,
   graceDurationSec: 300,
+  postRideDurationSec: 180,
   verifiedScore: 80,
 };
 

@@ -33,4 +33,6 @@ export interface GpsReading {
   /** Fix time, ms since epoch */
   timestamp: number;
   isMock: boolean;
+  /** Low-power network position sent while the app's battery saver is on. Used for the rider's live location only, never for speed or spoof checks. */
+  lowPower?: boolean;
 }

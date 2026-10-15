@@ -17,4 +17,6 @@ export interface RoomMember {
   /** @nullable */
   photoUrl: string | null;
   isSelf: boolean;
+  /** The room's moderator */
+  isHost: boolean;
 }

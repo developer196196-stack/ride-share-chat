@@ -17,5 +17,6 @@ export type ValidationSnapshotThresholds = {
   entrySustainSec: number;
   graceMph: number;
   graceDurationSec: number;
+  postRideDurationSec: number;
   verifiedScore: number;
 };

@@ -33,6 +33,7 @@ const keys = {
   state: (uid: string) => `val:${uid}`,
   location: (uid: string) => `loc:${uid}`,
   langHint: (uid: string) => `lang:hint:${uid}`,
+  /** GRACE and POST_RIDE deadlines, for the sweeper. */
   graceDeadlines: 'val:grace',
   lastSeen: 'val:seen',
   sweepLock: 'lock:val:sweep',
@@ -50,7 +51,7 @@ export type TerminationListener = (uid: string, reason: TerminationReason) => vo
 
 const TERMINATION_MESSAGES: Record<TerminationReason, string> = {
   spoof_detected: 'Location spoofing was detected, so this session was ended.',
-  exited_vehicle: 'It looks like you left the vehicle, so your R.O.O.M. session ended.',
+  exited_vehicle: 'Your ride has ended, so your R.O.O.M. session closed.',
   grace_expired: 'Your vehicle stayed stopped for more than 5 minutes, so the session ended.',
   signal_lost: 'We lost your trip signal.',
   user_ended: 'You ended the session.',
@@ -117,8 +118,10 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
     const redis = requireRedis(this.redis);
     const pipeline = redis.multi();
     pipeline.set(keys.state(uid), JSON.stringify(state), 'EX', STATE_TTL_SEC);
-    if (state.state === 'GRACE' && state.graceDeadline) {
-      pipeline.zadd(keys.graceDeadlines, state.graceDeadline, uid);
+    const deadline =
+      state.state === 'GRACE' ? state.graceDeadline : state.state === 'POST_RIDE' ? state.postRideDeadline : null;
+    if (deadline) {
+      pipeline.zadd(keys.graceDeadlines, deadline, uid);
     } else {
       pipeline.zrem(keys.graceDeadlines, uid);
     }
@@ -204,6 +207,7 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
         terminationReason: 'user_ended',
         graceDeadline: null,
         graceStartedAt: null,
+        postRideDeadline: null,
         stats:
           prev.state === 'GRACE' && prev.graceStartedAt
             ? { ...prev.stats, graceMs: prev.stats.graceMs + (now - prev.graceStartedAt) }
@@ -263,7 +267,7 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Grace expiry and lost-signal handling for riders who stopped sending telemetry. */
+  /** Grace / post-ride expiry and lost-signal handling for riders who stopped sending telemetry. */
   private async sweep(): Promise<void> {
     const redis = this.redis;
     if (!redis) return;

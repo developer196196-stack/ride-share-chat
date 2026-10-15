@@ -169,7 +169,8 @@ export const SubmitTelemetryBody = zod.object({
   "speedMps": zod.number().nullable().describe('OS-reported speed in m\/s (null when unavailable)'),
   "accuracyM": zod.number().min(submitTelemetryBodyGpsAccuracyMMin),
   "timestamp": zod.number().describe('Fix time, ms since epoch'),
-  "isMock": zod.boolean()
+  "isMock": zod.boolean(),
+  "lowPower": zod.boolean().optional().describe('Low-power network position sent while the app\'s battery saver is on. Used for the rider\'s live location only, never for speed or spoof checks.')
 }).optional().describe('Module 1 — one GPS fix'),
   "vibration": zod.object({
   "vehicleBandRatio": zod.number().min(submitTelemetryBodyVibrationVehicleBandRatioMin).max(submitTelemetryBodyVibrationVehicleBandRatioMax),
@@ -192,7 +193,7 @@ export const SubmitTelemetryBody = zod.object({
 })
 
 export const SubmitTelemetryResponse = zod.object({
-  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'TERMINATED']),
+  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'POST_RIDE', 'TERMINATED']).describe('POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.'),
   "score": zod.number(),
   "speedMph": zod.number(),
   "modules": zod.object({
@@ -208,12 +209,15 @@ export const SubmitTelemetryResponse = zod.object({
 }),
   "graceDeadline": zod.coerce.date().nullable(),
   "graceRemainingSec": zod.number().nullable(),
+  "postRideDeadline": zod.coerce.date().nullable().describe('End of the post-ride extension (POST_RIDE only)'),
+  "postRideRemainingSec": zod.number().nullable(),
   "terminationReason": zod.union([zod.literal('spoof_detected'),zod.literal('exited_vehicle'),zod.literal('grace_expired'),zod.literal('signal_lost'),zod.literal('user_ended'),zod.literal(null)]).nullable(),
   "thresholds": zod.object({
   "entryMph": zod.number(),
   "entrySustainSec": zod.number(),
   "graceMph": zod.number(),
   "graceDurationSec": zod.number(),
+  "postRideDurationSec": zod.number(),
   "verifiedScore": zod.number()
 }).describe('Active engine thresholds (configurable on the server via VALIDATION_\* env)'),
   "updatedAt": zod.coerce.date()
@@ -224,7 +228,7 @@ export const SubmitTelemetryResponse = zod.object({
  * @summary Current Trip Validation state
  */
 export const GetValidationStateResponse = zod.object({
-  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'TERMINATED']),
+  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'POST_RIDE', 'TERMINATED']).describe('POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.'),
   "score": zod.number(),
   "speedMph": zod.number(),
   "modules": zod.object({
@@ -240,12 +244,15 @@ export const GetValidationStateResponse = zod.object({
 }),
   "graceDeadline": zod.coerce.date().nullable(),
   "graceRemainingSec": zod.number().nullable(),
+  "postRideDeadline": zod.coerce.date().nullable().describe('End of the post-ride extension (POST_RIDE only)'),
+  "postRideRemainingSec": zod.number().nullable(),
   "terminationReason": zod.union([zod.literal('spoof_detected'),zod.literal('exited_vehicle'),zod.literal('grace_expired'),zod.literal('signal_lost'),zod.literal('user_ended'),zod.literal(null)]).nullable(),
   "thresholds": zod.object({
   "entryMph": zod.number(),
   "entrySustainSec": zod.number(),
   "graceMph": zod.number(),
   "graceDurationSec": zod.number(),
+  "postRideDurationSec": zod.number(),
   "verifiedScore": zod.number()
 }).describe('Active engine thresholds (configurable on the server via VALIDATION_\* env)'),
   "updatedAt": zod.coerce.date()
@@ -257,7 +264,7 @@ export const GetValidationStateResponse = zod.object({
  * @summary Start a new validation session (back to PENDING)
  */
 export const ResetValidationResponse = zod.object({
-  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'TERMINATED']),
+  "state": zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'POST_RIDE', 'TERMINATED']).describe('POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.'),
   "score": zod.number(),
   "speedMph": zod.number(),
   "modules": zod.object({
@@ -273,12 +280,15 @@ export const ResetValidationResponse = zod.object({
 }),
   "graceDeadline": zod.coerce.date().nullable(),
   "graceRemainingSec": zod.number().nullable(),
+  "postRideDeadline": zod.coerce.date().nullable().describe('End of the post-ride extension (POST_RIDE only)'),
+  "postRideRemainingSec": zod.number().nullable(),
   "terminationReason": zod.union([zod.literal('spoof_detected'),zod.literal('exited_vehicle'),zod.literal('grace_expired'),zod.literal('signal_lost'),zod.literal('user_ended'),zod.literal(null)]).nullable(),
   "thresholds": zod.object({
   "entryMph": zod.number(),
   "entrySustainSec": zod.number(),
   "graceMph": zod.number(),
   "graceDurationSec": zod.number(),
+  "postRideDurationSec": zod.number(),
   "verifiedScore": zod.number()
 }).describe('Active engine thresholds (configurable on the server via VALIDATION_\* env)'),
   "updatedAt": zod.coerce.date()
@@ -305,12 +315,16 @@ export const GetCurrentRoomResponse = zod.object({
   "roomId": zod.string(),
   "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
   "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
   "members": zod.array(zod.object({
   "uid": zod.string(),
   "displayName": zod.string(),
   "homeCity": zod.string().nullable(),
   "photoUrl": zod.string().nullable(),
-  "isSelf": zod.boolean()
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
 })),
   "livekit": zod.union([zod.object({
   "url": zod.string(),
@@ -335,12 +349,107 @@ export const JoinRoomResponse = zod.object({
   "roomId": zod.string(),
   "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
   "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
   "members": zod.array(zod.object({
   "uid": zod.string(),
   "displayName": zod.string(),
   "homeCity": zod.string().nullable(),
   "photoUrl": zod.string().nullable(),
-  "isSelf": zod.boolean()
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
+})),
+  "livekit": zod.union([zod.object({
+  "url": zod.string(),
+  "token": zod.string()
+}),zod.null()]).describe('Null when video is not configured on the server'),
+  "joinedAt": zod.coerce.date()
+})
+
+
+/**
+ * Live rooms across all moods, fullest first, each with its host preview and occupancy.
+ * Skips the rider's own room and rooms with someone they skipped in the last 60 minutes.
+ * Listing works before verification; joining needs VERIFIED.
+ * @summary Discovery Grid — up to 9 live R.O.O.M.s with open seats
+ */
+export const listDiscoverRoomsResponseRoomsMax = 9;
+
+
+
+export const ListDiscoverRoomsResponse = zod.object({
+  "rooms": zod.array(zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "memberCount": zod.number(),
+  "capacity": zod.number(),
+  "host": zod.union([zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date()
+})).max(listDiscoverRoomsResponseRoomsMax),
+  "liveRooms": zod.number().describe('All live rooms right now (including full ones)')
+})
+
+
+/**
+ * Requires VERIFIED. Leaves the rider's current room (if any) and opens a new public room for
+ * the mood; matchmaking fills the other 8 seats.
+ * @summary Host a Room — open a new R.O.O.M. with the rider as moderator
+ */
+export const HostRoomBody = zod.object({
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling'])
+})
+
+export const HostRoomResponse = zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
+  "members": zod.array(zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
+})),
+  "livekit": zod.union([zod.object({
+  "url": zod.string(),
+  "token": zod.string()
+}),zod.null()]).describe('Null when video is not configured on the server'),
+  "joinedAt": zod.coerce.date()
+})
+
+
+/**
+ * Requires VERIFIED. Leaves the rider's current room (if any) first.
+ * @summary Join a specific R.O.O.M. from the Discovery Grid
+ */
+export const JoinRoomByIdParams = zod.object({
+  "roomId": zod.coerce.string()
+})
+
+export const JoinRoomByIdResponse = zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
+  "members": zod.array(zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
 })),
   "livekit": zod.union([zod.object({
   "url": zod.string(),
@@ -359,12 +468,16 @@ export const NextRoomResponse = zod.object({
   "roomId": zod.string(),
   "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
   "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
   "members": zod.array(zod.object({
   "uid": zod.string(),
   "displayName": zod.string(),
   "homeCity": zod.string().nullable(),
   "photoUrl": zod.string().nullable(),
-  "isSelf": zod.boolean()
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
 })),
   "livekit": zod.union([zod.object({
   "url": zod.string(),
@@ -390,6 +503,260 @@ export const LeaveRoomResponse = zod.object({
   "graceSeconds": zod.number(),
   "vibe": zod.union([zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),zod.null()]),
   "endReason": zod.string()
+})
+
+
+/**
+ * Host only. A new mood moves the room to that mood's matchmaking pool. The room is public
+ * (on the Discovery Grid and open to matchmaking) only while matching is `auto` and it is not
+ * locked. Everyone in the room gets `ROOM_SETTINGS_CHANGED`.
+ * @summary Host controls — mood shift, automatic/manual matching, privacy lock
+ */
+export const UpdateRoomSettingsBody = zod.object({
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']).optional(),
+  "matching": zod.enum(['auto', 'manual']).optional().describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().optional()
+})
+
+export const UpdateRoomSettingsResponse = zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "capacity": zod.number(),
+  "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
+  "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
+  "locked": zod.boolean().describe('Privacy Lock — closed to new riders until the host unlocks it'),
+  "members": zod.array(zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isSelf": zod.boolean(),
+  "isHost": zod.boolean().describe('The room\'s moderator')
+})),
+  "livekit": zod.union([zod.object({
+  "url": zod.string(),
+  "token": zod.string()
+}),zod.null()]).describe('Null when video is not configured on the server'),
+  "joinedAt": zod.coerce.date()
+})
+
+
+/**
+ * Removes the rider from the room and video, and keeps them out of this room for the rest of its life (also through matchmaking). Their ride continues. They get `ROOM_EJECTED`.
+ * @summary Host — eject a rider
+ */
+export const EjectMemberParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const EjectMemberResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Mutes the rider’s microphone on the video server and sends them `FORCE_MUTED` ("The Host has muted your microphone."). They can unmute themselves later.
+ * @summary Host — force-mute a rider
+ */
+export const MuteMemberParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const MuteMemberResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Creates a moderation report (source `host_flag`) with recent room chat. Invisible to the flagged rider; the room carries on.
+ * @summary Host — silently flag a rider for Trust & Safety
+ */
+export const FlagMemberParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const flagMemberBodyNoteMax = 500;
+
+
+
+export const FlagMemberBody = zod.object({
+  "note": zod.string().max(flagMemberBodyNoteMax).nullish()
+})
+
+export const FlagMemberResponse = zod.object({
+  "id": zod.string()
+})
+
+
+/**
+ * Live room status is only included for friends (you follow each other).
+ * @summary Public profile with follow counts and your relationship
+ */
+export const GetUserProfileParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const GetUserProfileResponse = zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isFollowing": zod.boolean(),
+  "followsYou": zod.boolean(),
+  "live": zod.union([zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "isHost": zod.boolean(),
+  "memberCount": zod.number(),
+  "capacity": zod.number(),
+  "open": zod.boolean().describe('Public with a free seat (join directly); otherwise ask the host')
+}).describe('Where a friend is riding right now'),zod.null()]).describe('Only for friends (mutual follows) who are in a R.O.O.M. right now')
+}).and(zod.object({
+  "followerCount": zod.number(),
+  "followingCount": zod.number()
+}))
+
+
+/**
+ * @summary Follow a rider
+ */
+export const FollowUserParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const FollowUserResponse = zod.object({
+  "following": zod.boolean(),
+  "followerCount": zod.number()
+})
+
+
+/**
+ * @summary Unfollow a rider
+ */
+export const UnfollowUserParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const UnfollowUserResponse = zod.object({
+  "following": zod.boolean(),
+  "followerCount": zod.number()
+})
+
+
+/**
+ * @summary Riders you follow (friends who are riding now first)
+ */
+export const ListFollowingResponse = zod.object({
+  "users": zod.array(zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isFollowing": zod.boolean(),
+  "followsYou": zod.boolean(),
+  "live": zod.union([zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "isHost": zod.boolean(),
+  "memberCount": zod.number(),
+  "capacity": zod.number(),
+  "open": zod.boolean().describe('Public with a free seat (join directly); otherwise ask the host')
+}).describe('Where a friend is riding right now'),zod.null()]).describe('Only for friends (mutual follows) who are in a R.O.O.M. right now')
+}))
+})
+
+
+/**
+ * @summary Riders who follow you
+ */
+export const ListFollowersResponse = zod.object({
+  "users": zod.array(zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable(),
+  "isFollowing": zod.boolean(),
+  "followsYou": zod.boolean(),
+  "live": zod.union([zod.object({
+  "roomId": zod.string(),
+  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "isHost": zod.boolean(),
+  "memberCount": zod.number(),
+  "capacity": zod.number(),
+  "open": zod.boolean().describe('Public with a free seat (join directly); otherwise ask the host')
+}).describe('Where a friend is riding right now'),zod.null()]).describe('Only for friends (mutual follows) who are in a R.O.O.M. right now')
+}))
+})
+
+
+/**
+ * The invitee must follow you or be followed by you. They get `ROOM_INVITE`; the invite lasts
+ * 10 minutes and lets them into the room even while it is Manual or locked (never past an
+ * ejection or a recent skip).
+ * @summary Host — invite someone from your network into your room
+ */
+
+
+
+export const InviteToRoomBody = zod.object({
+  "uid": zod.string().min(1)
+})
+
+export const InviteToRoomResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Only for friends of the host (you follow each other) and only while the room is private. The host gets `ROOM_JOIN_REQUEST`.
+ * @summary Ask a friend's private room for a seat
+ */
+export const RequestToJoinRoomParams = zod.object({
+  "roomId": zod.coerce.string()
+})
+
+export const RequestToJoinRoomResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Host — pending join requests
+ */
+export const ListJoinRequestsResponse = zod.object({
+  "requests": zod.array(zod.object({
+  "user": zod.object({
+  "uid": zod.string(),
+  "displayName": zod.string(),
+  "homeCity": zod.string().nullable(),
+  "photoUrl": zod.string().nullable()
+}),
+  "requestedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Host — accept a join request (sends the rider an invite)
+ */
+export const AcceptJoinRequestParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const AcceptJoinRequestResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Host — decline a join request
+ */
+export const DeclineJoinRequestParams = zod.object({
+  "uid": zod.coerce.string()
+})
+
+export const DeclineJoinRequestResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 
@@ -589,7 +956,7 @@ export const GetPublicShareParams = zod.object({
 export const GetPublicShareResponse = zod.object({
   "riderName": zod.string(),
   "active": zod.boolean(),
-  "state": zod.union([zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'TERMINATED']),zod.null()]),
+  "state": zod.union([zod.enum(['PENDING', 'VERIFIED', 'GRACE', 'POST_RIDE', 'TERMINATED']).describe('POST_RIDE = the rider left the vehicle; the session stays live for the post-ride extension, then ends.'),zod.null()]),
   "speedMph": zod.number().nullable(),
   "location": zod.union([zod.object({
   "lat": zod.number(),

@@ -7,6 +7,7 @@ export const routes = {
   profileSetup: '/rider/onboarding/profile-setup',
   permissions: '/rider/onboarding/permissions',
   validation: '/rider/room/validation',
+  discover: '/rider/room/discover',
   vibeSelection: '/rider/room/vibe-selection',
   activeRoom: '/rider/room/active-room',
   rideSummary: '/rider/room/ride-summary',
@@ -16,6 +17,7 @@ export const routes = {
   settings: '/rider/account/settings',
   languageSettings: '/rider/account/language',
   safetyContacts: '/rider/account/safety-contacts',
+  network: '/rider/account/network',
 } as const;
 
 export type AppRoute = (typeof routes)[keyof typeof routes];

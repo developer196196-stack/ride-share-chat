@@ -93,6 +93,7 @@ function simulatedSample(state, scenario) {
   const cfg = {
     driving: { mph: 27, vib: 0.32, walking: 0, activity: { type: 'in_vehicle', confidence: 90 } },
     stopped_ev: { mph: 0, vib: 0.02, walking: 0, activity: { type: 'still', confidence: 80 } },
+    walking: { mph: 3, vib: 0.05, walking: 0.85, activity: { type: 'walking', confidence: 85 } },
   }[scenario];
   const dt = state.t ? (now - state.t) / 1000 : 0;
   state.lat += (cfg.mph * MPH * dt) / 111320;
@@ -137,7 +138,7 @@ async function driveUntil(socket, simState, scenario, predicate, maxMs) {
 
 async function cleanup(uids, extra) {
   for (const uid of uids) {
-    for (const sub of ['rides', 'trustedContacts']) {
+    for (const sub of ['rides', 'trustedContacts', 'following', 'followers']) {
       const snap = await db.collection('users').doc(uid).collection(sub).get().catch(() => null);
       for (const d of snap?.docs ?? []) await d.ref.delete().catch(() => undefined);
     }
@@ -217,9 +218,18 @@ async function main() {
 
     const joinA = await api(a.token, 'POST', '/v1/rooms/join', { vibe: 'party_mode' });
     report('rider A joins party_mode', joinA.status === 200, joinA.body?.roomId ?? JSON.stringify(joinA.body));
+    report('R.O.O.M. capacity is 9 (host included)', joinA.body?.capacity === 9, `capacity ${joinA.body?.capacity}`);
     report('LiveKit token issued', typeof joinA.body?.livekit?.token === 'string' && joinA.body.livekit.token.split('.').length === 3);
-    const joinB = await api(b.token, 'POST', '/v1/rooms/join', { vibe: 'party_mode' });
-    report('rider B lands in the same R.O.O.M.', joinB.status === 200 && joinB.body?.roomId === joinA.body?.roomId, `${joinB.body?.roomId}`);
+    report('quick-match opener hosts the new R.O.O.M.', joinA.body?.hostUid === a.uid && joinA.body?.members?.[0]?.isHost === true);
+
+    const grid = await api(b.token, 'GET', '/v1/rooms/discover');
+    const listed = grid.body?.rooms?.find((r) => r.roomId === joinA.body?.roomId);
+    report('Discovery Grid lists A\'s R.O.O.M. for B', grid.status === 200 && Boolean(listed), `${grid.body?.rooms?.length ?? 0} rooms, ${grid.body?.liveRooms} live`);
+    report('…with host preview and occupancy', listed?.host?.uid === a.uid && listed?.memberCount === 1 && listed?.capacity === 9, listed ? `${listed.host?.displayName} · ${listed.memberCount}/${listed.capacity}` : '');
+    const missing = await api(b.token, 'POST', '/v1/rooms/ROOM-0000-00/join');
+    report('joining a closed R.O.O.M. → 404 ROOM_NOT_FOUND', missing.status === 404 && missing.body?.code === 'ROOM_NOT_FOUND');
+    const joinB = await api(b.token, 'POST', `/v1/rooms/${joinA.body?.roomId}/join`);
+    report('rider B joins that R.O.O.M. from the grid', joinB.status === 200 && joinB.body?.roomId === joinA.body?.roomId, `${joinB.body?.roomId}`);
     await sleep(500);
     report('A notified ROOM_MEMBER_JOINED', sa.events.some((e) => e.event === 'ROOM_MEMBER_JOINED' && e.payload?.member?.uid === b.uid));
 
@@ -246,16 +256,112 @@ async function main() {
     const reportRes = await api(b.token, 'POST', '/v1/reports', { roomId: joinB.body?.roomId, reportedUid: a.uid, reason: 'spam', details: 'e2e test' });
     report('report participant', reportRes.status === 200);
 
+    const hostA = await api(a.token, 'POST', '/v1/rooms/host', { vibe: 'networking' });
+    report('A hosts a new R.O.O.M.', hostA.status === 200 && hostA.body?.hostUid === a.uid && hostA.body?.roomId !== joinA.body?.roomId, hostA.body?.roomId);
+    await sleep(800);
+    const handover = sb.events.find((e) => e.event === 'ROOM_HOST_CHANGED' && e.payload?.roomId === joinA.body?.roomId);
+    report('B becomes host of the old R.O.O.M. (ROOM_HOST_CHANGED)', handover?.payload?.hostUid === b.uid);
+    const joinHosted = await api(b.token, 'POST', `/v1/rooms/${hostA.body?.roomId}/join`);
+    report('B joins A\'s hosted R.O.O.M. by id', joinHosted.status === 200 && joinHosted.body?.hostUid === a.uid && joinHosted.body?.members?.length === 2);
+
+    // Host Moderation Toolkit
+    const hostedId = hostA.body?.roomId;
+    const notHost = await api(b.token, 'POST', `/v1/rooms/current/members/${a.uid}/mute`);
+    report('non-host cannot moderate (403 NOT_HOST)', notHost.status === 403 && notHost.body?.code === 'NOT_HOST');
+    const mute = await api(a.token, 'POST', `/v1/rooms/current/members/${b.uid}/mute`);
+    await sleep(600);
+    report('host force-mutes B', mute.status === 200 && mute.body?.ok === true);
+    report('…B gets FORCE_MUTED notice', sb.events.some((e) => e.event === 'FORCE_MUTED' && e.payload?.roomId === hostedId));
+    const flag = await api(a.token, 'POST', `/v1/rooms/current/members/${b.uid}/flag`, { note: 'e2e silent flag' });
+    const flagDoc = flag.body?.id ? await db.collection('reports').doc(flag.body.id).get() : null;
+    report('host silently flags B (report source host_flag)', flag.status === 200 && flagDoc?.data()?.source === 'host_flag' && flagDoc?.data()?.reportedUid === b.uid);
+    report('…B is not told', !sb.events.some((e) => JSON.stringify(e.payload ?? '').includes('flag')));
+    const settings = await api(a.token, 'PATCH', '/v1/rooms/current/settings', { vibe: 'deep_talks', locked: true });
+    await sleep(600);
+    report('mood shift + privacy lock', settings.status === 200 && settings.body?.vibe === 'deep_talks' && settings.body?.locked === true);
+    report('…everyone gets ROOM_SETTINGS_CHANGED', sb.events.some((e) => e.event === 'ROOM_SETTINGS_CHANGED' && e.payload?.vibe === 'deep_talks' && e.payload?.locked === true));
+    const lockedGrid = await api(a.token, 'GET', '/v1/rooms/discover');
+    const listedLocked = (await api(b.token, 'GET', '/v1/rooms/discover')).body?.rooms?.some((r) => r.roomId === hostedId);
+    report('locked R.O.O.M. is off the Discovery Grid', lockedGrid.status === 200 && !listedLocked);
+    const badSettings = await api(a.token, 'PATCH', '/v1/rooms/current/settings', {});
+    report('empty settings update → 422', badSettings.status === 422);
+    const eject = await api(a.token, 'POST', `/v1/rooms/current/members/${b.uid}/eject`);
+    await sleep(600);
+    report('host ejects B', eject.status === 200);
+    report('…B gets ROOM_EJECTED', sb.events.some((e) => e.event === 'ROOM_EJECTED' && e.payload?.roomId === hostedId));
+    const afterEject = await api(b.token, 'GET', '/v1/rooms/current');
+    report('…B is out of the R.O.O.M.', afterEject.status === 200 && afterEject.body?.room === null);
+    await api(a.token, 'PATCH', '/v1/rooms/current/settings', { locked: false });
+    // B's phone keeps sending telemetry (otherwise the server moves B to GRACE after 60 s of silence).
+    await driveUntil(sb.socket, simB, 'driving', (st) => st.state === 'VERIFIED', 20_000);
+    const rejoin = await api(b.token, 'POST', `/v1/rooms/${hostedId}/join`);
+    report('…and cannot rejoin it (ROOM_UNAVAILABLE)', rejoin.status === 409 && rejoin.body?.code === 'ROOM_UNAVAILABLE', `${rejoin.status} ${rejoin.body?.code}`);
+    const backIn = await api(b.token, 'POST', '/v1/rooms/join', { vibe: 'party_mode' });
+    report('ejected rider keeps riding: quick match elsewhere', backIn.status === 200 && backIn.body?.roomId !== hostedId);
+
+    // Follow system, friends riding now, join requests and invites
+    const followAB = await api(b.token, 'POST', `/v1/users/${a.uid}/follow`);
+    report('B follows A', followAB.status === 200 && followAB.body?.following === true && followAB.body?.followerCount === 1);
+    const oneWay = await api(b.token, 'GET', `/v1/users/${a.uid}`);
+    report('one-way follow: profile without live room', oneWay.status === 200 && oneWay.body?.isFollowing === true && oneWay.body?.followsYou === false && oneWay.body?.live === null);
+    // A's phone keeps sending telemetry so A is still VERIFIED (60 s of silence moves a rider to GRACE).
+    await driveUntil(sa.socket, simA, 'driving', (st) => st.state === 'VERIFIED', 20_000);
+    const aRoomRes = await api(a.token, 'POST', '/v1/rooms/host', { vibe: 'just_chilling' });
+    const aRoom = aRoomRes.body?.roomId;
+    report('A hosts a room for friends', aRoomRes.status === 200, `${aRoomRes.status} ${aRoomRes.body?.code ?? aRoom}`);
+    await api(a.token, 'PATCH', '/v1/rooms/current/settings', { matching: 'manual' });
+    const notFriends = await api(b.token, 'POST', `/v1/rooms/${aRoom}/requests`);
+    report('non-friend cannot request to join (403 NOT_FRIENDS)', notFriends.status === 403 && notFriends.body?.code === 'NOT_FRIENDS');
+    const followBA = await api(a.token, 'POST', `/v1/users/${b.uid}/follow`);
+    report('A follows back → friends', followBA.status === 200);
+    const following = await api(b.token, 'GET', '/v1/me/following');
+    const aLive = following.body?.users?.find((u) => u.uid === a.uid)?.live;
+    report('friends riding now: B sees A\'s private room', aLive?.roomId === aRoom && aLive?.isHost === true && aLive?.open === false);
+    const followers = await api(a.token, 'GET', '/v1/me/followers');
+    report('A\'s followers list has B', followers.body?.users?.some((u) => u.uid === b.uid && u.isFollowing && u.followsYou));
+    const privateJoin = await api(b.token, 'POST', `/v1/rooms/${aRoom}/join`);
+    report('manual room: joining without invite → 409 ROOM_PRIVATE', privateJoin.status === 409 && privateJoin.body?.code === 'ROOM_PRIVATE');
+    await driveUntil(sb.socket, simB, 'driving', (st) => st.state === 'VERIFIED', 20_000);
+    const req1 = await api(b.token, 'POST', `/v1/rooms/${aRoom}/requests`);
+    await sleep(600);
+    report('friend requests a seat', req1.status === 200);
+    report('…host gets ROOM_JOIN_REQUEST', sa.events.some((e) => e.event === 'ROOM_JOIN_REQUEST' && e.payload?.requester?.uid === b.uid));
+    const pending = await api(a.token, 'GET', '/v1/rooms/current/requests');
+    report('…and sees it in pending requests', pending.body?.requests?.some((r) => r.user.uid === b.uid));
+    await api(a.token, 'POST', `/v1/rooms/current/requests/${b.uid}/decline`);
+    await sleep(600);
+    report('decline → requester gets ROOM_REQUEST_DECLINED', sb.events.some((e) => e.event === 'ROOM_REQUEST_DECLINED' && e.payload?.roomId === aRoom));
+    await api(b.token, 'POST', `/v1/rooms/${aRoom}/requests`);
+    const accept = await api(a.token, 'POST', `/v1/rooms/current/requests/${b.uid}/accept`);
+    await sleep(600);
+    report('accept → requester gets ROOM_INVITE', accept.status === 200 && sb.events.some((e) => e.event === 'ROOM_INVITE' && e.payload?.roomId === aRoom && e.payload?.viaRequest === true));
+    const invitedJoin = await api(b.token, 'POST', `/v1/rooms/${aRoom}/join`);
+    report('invite lets B into the manual room', invitedJoin.status === 200 && invitedJoin.body?.roomId === aRoom && invitedJoin.body?.matching === 'manual');
+    const reinvite = await api(a.token, 'POST', '/v1/rooms/current/invites', { uid: b.uid });
+    report('inviting someone already inside → 409 ALREADY_IN_ROOM', reinvite.status === 409 && reinvite.body?.code === 'ALREADY_IN_ROOM');
+    // Back to auto-fill so the Instant Escape checks below see a public room.
+    await api(a.token, 'PATCH', '/v1/rooms/current/settings', { matching: 'auto' });
+
     const next = await api(b.token, 'POST', '/v1/rooms/next');
-    report('Next: B moved to a different R.O.O.M.', next.status === 200 && next.body?.roomId !== joinA.body?.roomId, next.body?.roomId);
+    report('Next: B moved to a different R.O.O.M.', next.status === 200 && next.body?.roomId !== aRoom, next.body?.roomId);
     const joinAgain = await api(b.token, 'POST', '/v1/rooms/next');
-    report('Next again: still never back with A (60-min block)', joinAgain.status === 200 && joinAgain.body?.roomId !== joinA.body?.roomId);
+    report('Next again: still never back with A (60-min block)', joinAgain.status === 200 && joinAgain.body?.roomId !== aRoom);
+    const hiddenGrid = await api(b.token, 'GET', '/v1/rooms/discover');
+    report('Discovery Grid hides A\'s R.O.O.M. from B after Next', hiddenGrid.status === 200 && !hiddenGrid.body?.rooms?.some((r) => r.roomId === aRoom));
+    const blockedJoin = await api(b.token, 'POST', `/v1/rooms/${aRoom}/join`);
+    report('…and blocks joining it by id (ROOM_UNAVAILABLE)', blockedJoin.status === 409 && blockedJoin.body?.code === 'ROOM_UNAVAILABLE');
 
     console.log('…simulating an EV stop for ~17 s (grace needs 15 s below 5 mph)');
     const grace = await driveUntil(sa.socket, simA, 'stopped_ev', (s) => s.state === 'GRACE', 25_000);
     report('A enters GRACE at a stop (EV, no vibration)', grace?.state === 'GRACE', `remaining ${grace?.graceRemainingSec}s`);
     const recovered = await driveUntil(sa.socket, simA, 'driving', (s) => s.state === 'VERIFIED', 20_000);
     report('A recovers to VERIFIED when moving', recovered?.state === 'VERIFIED');
+
+    console.log('…simulating A getting out and walking for ~22 s (exit needs 20 s of walking)');
+    const postRide = await driveUntil(sa.socket, simA, 'walking', (s) => s.state === 'POST_RIDE', 35_000);
+    report('A enters POST_RIDE after leaving the vehicle', postRide?.state === 'POST_RIDE', `remaining ${postRide?.postRideRemainingSec}s of ${postRide?.thresholds?.postRideDurationSec}s`);
+    const stillIn = await api(a.token, 'GET', '/v1/rooms/current');
+    report('A keeps the R.O.O.M. during the post-ride extension', stillIn.status === 200 && stillIn.body?.room != null);
 
     const leave = await api(a.token, 'POST', '/v1/rooms/leave');
     report('A leaves → ride summary', leave.status === 200 && typeof leave.body?.durationSec === 'number', `peers ${leave.body?.peersMet}, grace ${leave.body?.graceCount}, ${leave.body?.distanceMiles} mi`);

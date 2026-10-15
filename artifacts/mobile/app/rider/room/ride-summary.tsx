@@ -134,7 +134,7 @@ export default function RideSummaryScreen() {
           iconPosition="left"
           height={48}
           borderRadius={radius.xl}
-          onPress={() => router.replace(routes.validation)}
+          onPress={() => router.replace(routes.discover)}
         />
         <View style={styles.secondaryActions}>
           <Button

@@ -9,6 +9,9 @@ import { useTripStore } from '@/stores/trip.store';
 
 const KEEP_AWAKE_TAG = 'trip-session';
 
+/** Screens where an unverified rider is waiting to be verified. */
+const VALIDATION_SCREENS: ReadonlySet<string> = new Set([routes.discover, routes.validation, routes.vibeSelection]);
+
 /** Releasing a wake lock that was never acquired throws (notably on web). */
 function releaseKeepAwake(): void {
   try {
@@ -33,16 +36,25 @@ export function TripSessionHost() {
   const termination = useTripStore((s) => s.termination);
   const collector = useRef<TelemetryCollector | null>(null);
 
+  // Before a ride is verified, sensors run only on the screens that need them (Home, Trip
+  // Validation, mood picker). Once a ride is under way they keep running everywhere, so a rider can
+  // open Settings mid-ride without their trip timing out.
+  const rideUnderway = state === 'VERIFIED' || state === 'GRACE' || state === 'POST_RIDE' || inRoom;
+  const onValidationScreen = VALIDATION_SCREENS.has(pathname);
+  const collecting = active && isAuthenticated && (rideUnderway || onValidationScreen);
+
   // Collector lifecycle.
   useEffect(() => {
-    if (!active || !isAuthenticated) {
+    if (!collecting) {
       collector.current?.stop();
       collector.current = null;
+      useTripStore.getState().setPowerSaver(false);
       releaseKeepAwake();
       return;
     }
     const instance = new TelemetryCollector({
       onSnapshot: (snapshot) => useTripStore.getState().setSnapshot(snapshot),
+      onPowerChange: (mode) => useTripStore.getState().setPowerSaver(mode === 'saver'),
       getScenario: () => useSimulatorStore.getState().scenario,
     });
     collector.current = instance;
@@ -50,9 +62,10 @@ export function TripSessionHost() {
     void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
     return () => {
       instance.stop();
+      useTripStore.getState().setPowerSaver(false);
       releaseKeepAwake();
     };
-  }, [active, isAuthenticated]);
+  }, [collecting]);
 
   // 2 s polling before verification, 10 s inside a R.O.O.M.
   useEffect(() => {

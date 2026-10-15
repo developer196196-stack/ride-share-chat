@@ -9,6 +9,7 @@
  * OpenAPI spec version: 0.3.0
  */
 import type { LiveKitConnection } from './liveKitConnection';
+import type { RoomMatching } from './roomMatching';
 import type { RoomMember } from './roomMember';
 import type { Vibe } from './vibe';
 
@@ -16,6 +17,14 @@ export interface RoomSession {
   roomId: string;
   vibe: Vibe;
   capacity: number;
+  /**
+     * The room's moderator (opened the room, or the longest-present rider after the host left)
+     * @nullable
+     */
+  hostUid: string | null;
+  matching: RoomMatching;
+  /** Privacy Lock — closed to new riders until the host unlocks it */
+  locked: boolean;
   members: RoomMember[];
   /** Null when video is not configured on the server */
   livekit: LiveKitConnection | null;
