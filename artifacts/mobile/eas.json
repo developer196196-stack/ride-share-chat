@@ -8,12 +8,13 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "20.18.0",
+      "node": "20.19.4",
       "pnpm": "10.26.1"
     },
     "preview": {
       "distribution": "internal",
-      "node": "20.18.0",
+      "environment": "preview",
+      "node": "20.19.4",
       "pnpm": "10.26.1",
       "android": {
         "buildType": "apk"
@@ -22,9 +23,22 @@
         "simulator": true
       }
     },
+    "preview-device": {
+      "distribution": "internal",
+      "environment": "preview",
+      "node": "20.19.4",
+      "pnpm": "10.26.1",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "enterpriseProvisioning": "adhoc"
+      }
+    },
     "production": {
+      "environment": "production",
       "autoIncrement": true,
-      "node": "20.18.0",
+      "node": "20.19.4",
       "pnpm": "10.26.1",
       "android": {
         "buildType": "app-bundle"

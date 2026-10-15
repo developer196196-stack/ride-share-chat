@@ -5,6 +5,8 @@
  *   Module 1 GPS (40%) · Module 2 micro-vibration (25%) · Module 3 ground truth (35%).
  * A module with no data counts as a neutral 50, so a rider can never reach VERIFIED
  * on GPS alone. States: PENDING → VERIFIED ⇄ GRACE → POST_RIDE → TERMINATED.
+ * Entering VERIFIED needs a score of 80; staying in (or recovering to) VERIFIED while clearly
+ * moving needs the grace band (50+), so sensor noise never ends a ride that is under way.
  * POST_RIDE is the post-ride extension: after the rider leaves the vehicle the session stays
  * live for a few minutes (default 3), then ends.
  */
@@ -235,6 +237,11 @@ export function reduceSample(
     const sustainedStop = s.belowSince != null && now - s.belowSince >= C.speed.graceSustainMs;
     const sustainedLowScore = s.lowScoreSince != null && now - s.lowScoreSince >= C.lowScoreSustainMs;
     const exited = s.walkingSince != null && now - s.walkingSince >= C.walkingSustainMs;
+    // Hysteresis: a ride must score 80 to be VERIFIED, but once verified, clearly moving above the
+    // entry speed with a score in the grace band or better (>= 50) keeps it in progress. Without
+    // this, normal sensor noise around 80 drops moving riders into GRACE, and a ride that settles
+    // just under 80 can never recover and gets terminated while driving.
+    const movingInRide = sustainedEntry && s.score >= C.bands.grace;
 
     if (spoof) {
       s = terminate(s, 'spoof_detected', now);
@@ -243,7 +250,7 @@ export function reduceSample(
     } else if (s.state === 'POST_RIDE') {
       if (postRideOver(s, now)) {
         s = terminate(s, 'exited_vehicle', now);
-      } else if (!walking && sustainedEntry && s.score >= C.bands.verified) {
+      } else if (!walking && movingInRide) {
         // Back in a moving vehicle (or the walking signal was a false alarm).
         s = { ...s, state: 'VERIFIED', postRideDeadline: null };
       }
@@ -254,14 +261,14 @@ export function reduceSample(
         s.stats = { startedAt: now, distanceM: 0, movingMs: 0, graceCount: 0, graceMs: 0 };
       }
     } else if (s.state === 'VERIFIED') {
-      if (sustainedStop || sustainedLowScore) {
+      if (sustainedStop || (sustainedLowScore && !movingInRide)) {
         s.state = 'GRACE';
         s.graceStartedAt = now;
         s.graceDeadline = now + C.graceDurationMs;
         s.stats.graceCount += 1;
       }
     } else if (s.state === 'GRACE') {
-      if (sustainedEntry && s.score >= C.bands.verified) {
+      if (movingInRide) {
         s.state = 'VERIFIED';
         s.stats.graceMs += now - (s.graceStartedAt ?? now);
         s.graceDeadline = null;

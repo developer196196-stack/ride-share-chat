@@ -4,9 +4,9 @@
  * dock: Host a Room (open your own room as moderator) or Join a Room (quick match by mood).
  * Tapping a room card drops the rider into that specific room.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +29,7 @@ import { ErrorBanner, Icon, LiveDot, OptionSheet, Screen, type Option } from '@/
 import { BottomTabBar, LogoTile } from '@/components/rideshare';
 import { SafetyFab } from '@/components/safety/SafetyFab';
 import { FriendsStrip } from '@/components/social/FriendsStrip';
+import { useTrip } from '@/hooks/use-trip';
 import { getApiErrorMessage } from '@/lib/api/error-message';
 import { useAuthStore } from '@/stores/auth.store';
 import { useTripStore } from '@/stores/trip.store';
@@ -142,7 +143,19 @@ export default function DiscoverScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const state = useTripStore((s) => s.snapshot?.state);
+  const speedMph = useTripStore((s) => s.snapshot?.speedMph ?? 0);
   const currentRoom = useTripStore((s) => s.room);
+  const { startTrip } = useTrip();
+
+  // Home runs trip validation in the background: start it when Home is shown (and start a fresh
+  // one after a finished ride), so rooms unlock as soon as the rider is moving.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) return;
+      const store = useTripStore.getState();
+      if (!store.active || store.snapshot?.state === 'TERMINATED') void startTrip();
+    }, [isAuthenticated, startTrip]),
+  );
   const grid = useListDiscoverRooms({
     query: { queryKey: getListDiscoverRoomsQueryKey(), enabled: isAuthenticated, refetchInterval: 5_000 },
   });
@@ -229,7 +242,11 @@ export default function DiscoverScreen() {
         {!verified ? (
           <Pressable style={styles.verifyBanner} onPress={() => router.push(routes.validation)}>
             <Icon name="solarCarLinear" size={18} color={colors.chart3} />
-            <Text style={styles.verifyText}>Rooms open once your ride is verified. Tap to check your trip.</Text>
+            <Text style={styles.verifyText}>
+              {state === 'GRACE'
+                ? 'Vehicle stopped — your trip resumes once you are moving again.'
+                : `Waiting for your ride to start${speedMph > 0 ? ` (${Math.round(speedMph)} MPH)` : ''}. Rooms open once you're verified — tap for details.`}
+            </Text>
           </Pressable>
         ) : null}
 

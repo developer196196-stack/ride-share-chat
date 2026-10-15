@@ -1,0 +1,42 @@
+# EAS Build ignore file (used instead of .gitignore when uploading to EAS)
+
+# Dependencies & Build Artifacts
+node_modules/
+**/node_modules/
+.pnpm-store/
+dist/
+**/dist/
+build/
+**/build/
+.expo/
+**/.expo/
+android/
+**/android/
+ios/
+**/ios/
+
+# Environment & Local Files
+# EXPO_PUBLIC_* values for builds come from eas.json / EAS environment variables, not local .env files.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+.info.txt
+
+# Git & Agent Folders
+.git/
+.agents/
+.claude/
+.cursor/
+.canvas/
+screenshots/
+attached_assets/
+docs/
+sleek-temp-ref/
+artifacts/mockup-sandbox/
+
+# System Files
+.DS_Store
+Thumbs.db

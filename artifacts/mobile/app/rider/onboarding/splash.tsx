@@ -50,7 +50,7 @@ export default function SplashScreen() {
         return;
       }
       // Offline or API down: trust what we know locally.
-      router.replace(flags.permissionsDone ? routes.validation : routes.permissions);
+      router.replace(flags.permissionsDone ? routes.discover : routes.permissions);
     }
   }, [isAuthenticated, router]);
 

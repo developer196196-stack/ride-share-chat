@@ -16,7 +16,7 @@ import { routes } from '@/constants/routes';
 import type { IconName } from '@/constants/icons';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, GlowBlob, Icon, IconButton, LiveDot, Pill, Screen, Spin } from '@/components/ui';
-import { LogoTile, ValidationRing, type RingTone } from '@/components/rideshare';
+import { BottomTabBar, LogoTile, ValidationRing, type RingTone } from '@/components/rideshare';
 import { SafetyFab } from '@/components/safety/SafetyFab';
 import { SafetySheet } from '@/components/safety/SafetySheet';
 import { useTrip } from '@/hooks/use-trip';
@@ -157,7 +157,7 @@ export default function TripValidationScreen() {
     const before = previousState.current;
     previousState.current = liveState;
     if (liveState !== 'VERIFIED' || before == null || before === 'VERIFIED' || detailsOpen || !focused.current) return;
-    const timer = setTimeout(() => router.push(routes.discover), VERIFIED_HOLD_MS);
+    const timer = setTimeout(() => router.dismissTo(routes.discover), VERIFIED_HOLD_MS);
     return () => clearTimeout(timer);
   }, [liveState, detailsOpen, router]);
 
@@ -176,7 +176,7 @@ export default function TripValidationScreen() {
 
   return (
     <View style={styles.root}>
-      <Screen contentStyle={styles.content}>
+      <Screen contentStyle={styles.content} edges={['top']} footer={<BottomTabBar active="home" />}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <LogoTile size={56} padding={6} rounded="2xl" elevation="sm" />
@@ -363,7 +363,7 @@ export default function TripValidationScreen() {
             borderRadius={radius.xl}
             weight="semibold"
             style={styles.cta}
-            onPress={() => router.push(routes.discover)}
+            onPress={() => router.dismissTo(routes.discover)}
           />
         ) : null}
         <Button
@@ -392,7 +392,8 @@ const RING = 10;
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  fab: { bottom: 32 },
+  // Above the tab bar.
+  fab: { bottom: 96 },
   waitSheet: {
     marginTop: 4,
     padding: 18,
@@ -445,7 +446,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 32,
+    // Room for the tab bar.
+    paddingBottom: 112,
   },
   header: {
     flexDirection: 'row',

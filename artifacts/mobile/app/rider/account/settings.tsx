@@ -333,8 +333,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   settingText: {
+    // Fills the row so rows without a chevron keep their text next to the icon.
     flex: 1,
-    maxWidth: 240,
     gap: 2,
   },
   settingTitle: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, withAlpha } from '@/constants/colors';
 import { MAX_CONTENT_WIDTH } from '@/constants/layout';
@@ -20,6 +20,7 @@ const TABS: { key: Tab; label: string; icon: IconName; activeIcon: IconName; hre
 /** Fixed bottom nav (Home = Discovery Grid · History · Settings). */
 export function BottomTabBar({ active }: { active: Tab }) {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
   return (
@@ -33,7 +34,8 @@ export function BottomTabBar({ active }: { active: Tab }) {
               key={tab.key}
               style={styles.tab}
               onPress={() => {
-                if (!isActive) router.push(tab.href as never);
+                // Home is also highlighted on Trip Validation, so it still navigates from there.
+                if (pathname !== tab.href) router.push(tab.href as never);
               }}
             >
               <Icon name={isActive ? tab.activeIcon : tab.icon} size={20} color={color} />

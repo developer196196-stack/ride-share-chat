@@ -31,8 +31,11 @@ export async function getOnboardingFlags(): Promise<OnboardingFlags> {
 export const markIntroSeen = () => write(INTRO_KEY);
 export const markPermissionsDone = () => write(PERMISSIONS_KEY);
 
-/** Where a signed-in rider goes next: finish the profile, grant permissions once, then Trip Validation. */
+/**
+ * Where a signed-in rider goes next: finish the profile, grant permissions once, then Home (the
+ * Discovery Grid). Trip validation runs in the background there; only rooms need a verified ride.
+ */
 export function routeForSignedInRider(profileComplete: boolean, flags: OnboardingFlags): AppRoute {
   if (!profileComplete) return routes.profileSetup;
-  return flags.permissionsDone ? routes.validation : routes.permissions;
+  return flags.permissionsDone ? routes.discover : routes.permissions;
 }

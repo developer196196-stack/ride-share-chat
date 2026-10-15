@@ -129,7 +129,7 @@ export default function ConnectionsScreen() {
           height={48}
           borderRadius={radius.xl}
           size="xs"
-          onPress={() => router.push(routes.validation)}
+          onPress={() => router.push(routes.discover)}
         />
       </View>
     </Screen>

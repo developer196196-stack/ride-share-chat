@@ -126,6 +126,35 @@ describe('Trip Validation Engine', () => {
     assert.equal(s.stats.graceCount, 1);
   });
 
+  it('stays VERIFIED while moving when sensor noise drops the score below 80', () => {
+    let { s, t } = verified();
+    // Smooth road: no vehicle-band vibration, so the score settles around 70 (40 GPS + 0 + ~31 ground truth).
+    s = drive(s, t + 10_000, t + 3 * 60_000, 10_000, (tt) => sample(tt, 30, { vib: 0.05, activity: inVehicle }));
+    assert.ok(s.score < C.bands.verified && s.score >= C.bands.grace, `score ${s.score}`);
+    assert.equal(s.state, 'VERIFIED');
+    assert.equal(s.stats.graceCount, 0);
+  });
+
+  it('recovers from a long traffic jam at speed even when the score settles below 80', () => {
+    let { s, t } = verified();
+    // 4 minutes crawling below 5 mph → GRACE.
+    s = drive(s, t + 10_000, t + 4 * 60_000, 10_000, (tt) => sample(tt, 3, { vib: 0.05, activity: inVehicle }));
+    assert.equal(s.state, 'GRACE');
+    // Then 60 mph on a smooth highway: score in the 70s, still well inside the grace window.
+    s = drive(s, t + 4 * 60_000 + 10_000, t + 6 * 60_000, 10_000, (tt) => sample(tt, 60, { vib: 0.05, activity: inVehicle }));
+    assert.equal(s.state, 'VERIFIED', `score ${s.score}`);
+    assert.equal(s.terminationReason, null);
+  });
+
+  it('still drops to GRACE when the score collapses while moving (speed but no vehicle signal)', () => {
+    let { s, t } = verified();
+    s = drive(s, t + 10_000, t + 3 * 60_000, 10_000, (tt) =>
+      sample(tt, 30, { vib: 0.01, activity: { type: 'unknown', confidence: 0 } }),
+    );
+    assert.ok(s.score < C.bands.grace, `score ${s.score}`);
+    assert.equal(s.state, 'GRACE');
+  });
+
   it('keeps an electric car (no idle vibration) in GRACE until the 5-minute timer', () => {
     let { s, t } = verified();
     const stopped = (tt: number) => sample(tt, 0, { vib: 0.02, activity: { type: 'still', confidence: 80 } });
