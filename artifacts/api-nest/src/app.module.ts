@@ -12,6 +12,7 @@ import { RedisModule } from './redis/redis.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { SafetyModule } from './safety/safety.module';
 import { SocialModule } from './social/social.module';
+import { AdminModule } from './admin/admin.module';
 import { ValidationModule } from './validation/validation.module';
 import { loadAppConfig } from './config/configuration';
 
@@ -31,6 +32,7 @@ import { loadAppConfig } from './config/configuration';
     RoomsModule,
     SafetyModule,
     SocialModule,
+    AdminModule,
     GatewayModule,
   ],
 })

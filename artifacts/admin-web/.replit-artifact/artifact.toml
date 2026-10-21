@@ -1,0 +1,36 @@
+kind = "web"
+previewPath = "/"
+title = "Rideshare Chats Admin"
+description = "Operations console for Rideshare Chats: riders, reports, live rooms, safety alerts and Trip Validation settings."
+version = "1.0.0"
+id = "artifacts/admin-web"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24276
+
+[services.development]
+run = "pnpm --filter @workspace/admin-web run dev"
+
+[services.production]
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/admin-web", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["pnpm", "--filter", "@workspace/admin-web", "run", "start"]
+
+[services.production.run.env]
+PORT = "24276"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/"
+
+[services.env]
+PORT = "24276"

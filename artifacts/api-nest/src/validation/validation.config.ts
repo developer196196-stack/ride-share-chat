@@ -2,9 +2,9 @@
  * Trip Validation Engine tuning. Defaults follow the client specification with the
  * adjustments agreed in the implementation plan (v2.1, section 4).
  *
- * Every rider-facing threshold can be overridden from the environment (VALIDATION_*), e.g.
- * to test at a desk with relaxed values. Production should use the defaults (unset) until
- * real-car field testing says otherwise. See artifacts/api-nest/env.template.
+ * Thresholds are managed ONLY from the admin panel (Trip Validation page), stored in Firestore
+ * `appConfig/validation` and applied at runtime. `.env` is not read for them; anything not set in
+ * the panel uses the production default below.
  */
 const MPH_TO_MPS = 0.44704;
 
@@ -174,14 +174,37 @@ export type ValidationSettings = ReturnType<typeof buildValidationConfig>;
 
 let current: ValidationSettings | null = null;
 
-/** Built on first use, after Nest has loaded `.env`. */
+/**
+ * Values set from the admin panel (Firestore `appConfig/validation`), keyed by the VALIDATION_*
+ * names (plus ROOM_SKIP_BLOCK_SEC). The only source besides the defaults.
+ */
+let overrides: Record<string, string> = {};
+
 export function getValidationConfig(): ValidationSettings {
-  if (!current) current = buildValidationConfig();
+  if (!current) current = buildValidationConfig(overrides);
   return current;
+}
+
+export function getValidationOverrides(): Record<string, string> {
+  return { ...overrides };
+}
+
+/** Replaces the admin overrides and rebuilds the live config (takes effect on the next sample). */
+export function setValidationOverrides(next: Record<string, string | number | boolean>): void {
+  overrides = Object.fromEntries(Object.entries(next).map(([key, value]) => [key, String(value)]));
+  current = buildValidationConfig(overrides);
+}
+
+/** Instant Escape ("Next"): seconds skipped riders are kept apart. Admin panel, default 60 minutes. */
+export const ROOM_SKIP_BLOCK_DEFAULT_SEC = 60 * 60;
+
+export function getRoomSkipBlockSec(): number {
+  return num(overrides, 'ROOM_SKIP_BLOCK_SEC', ROOM_SKIP_BLOCK_DEFAULT_SEC, 0, 24 * 60 * 60);
 }
 
 /** Tests: rebuild from a specific environment (or defaults with `{}`). */
 export function setValidationConfigForTests(env: Env): void {
+  overrides = {};
   current = buildValidationConfig(env);
 }
 
@@ -190,8 +213,8 @@ export const ValidationConfig: ValidationSettings = new Proxy({} as ValidationSe
   get: (_target, key) => getValidationConfig()[key as keyof ValidationSettings],
 });
 
-/** Names of VALIDATION_* overrides that differ from production defaults (for a startup warning). */
-export function relaxedValidationOverrides(env: Env = process.env): string[] {
+/** Admin-panel values that differ from production defaults (logged as a warning). */
+export function relaxedValidationOverrides(env: Env = overrides): string[] {
   const d = VALIDATION_DEFAULTS;
   const keys: [string, number | boolean][] = [
     ['VALIDATION_ENTRY_MPH', d.entryMph],

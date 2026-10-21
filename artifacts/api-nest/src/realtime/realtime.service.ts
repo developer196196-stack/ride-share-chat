@@ -28,6 +28,11 @@ export class RealtimeService {
     this.server?.to(RealtimeService.userRoom(uid)).emit(event, payload);
   }
 
+  /** Drops every socket of `uid` (account suspended). */
+  disconnectUser(uid: string): void {
+    this.server?.in(RealtimeService.userRoom(uid)).disconnectSockets(true);
+  }
+
   emitToUsers(uids: string[], event: string, payload: unknown): void {
     if (!this.server || uids.length === 0) return;
     this.server.to(uids.map((uid) => RealtimeService.userRoom(uid))).emit(event, payload);

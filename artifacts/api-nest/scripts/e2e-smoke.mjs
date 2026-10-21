@@ -218,14 +218,14 @@ async function main() {
 
     const joinA = await api(a.token, 'POST', '/v1/rooms/join', { vibe: 'party_mode' });
     report('rider A joins party_mode', joinA.status === 200, joinA.body?.roomId ?? JSON.stringify(joinA.body));
-    report('R.O.O.M. capacity is 9 (host included)', joinA.body?.capacity === 9, `capacity ${joinA.body?.capacity}`);
+    report('R.O.O.M. capacity is 6 (host included)', joinA.body?.capacity === 6, `capacity ${joinA.body?.capacity}`);
     report('LiveKit token issued', typeof joinA.body?.livekit?.token === 'string' && joinA.body.livekit.token.split('.').length === 3);
     report('quick-match opener hosts the new R.O.O.M.', joinA.body?.hostUid === a.uid && joinA.body?.members?.[0]?.isHost === true);
 
     const grid = await api(b.token, 'GET', '/v1/rooms/discover');
     const listed = grid.body?.rooms?.find((r) => r.roomId === joinA.body?.roomId);
     report('Discovery Grid lists A\'s R.O.O.M. for B', grid.status === 200 && Boolean(listed), `${grid.body?.rooms?.length ?? 0} rooms, ${grid.body?.liveRooms} live`);
-    report('…with host preview and occupancy', listed?.host?.uid === a.uid && listed?.memberCount === 1 && listed?.capacity === 9, listed ? `${listed.host?.displayName} · ${listed.memberCount}/${listed.capacity}` : '');
+    report('…with host preview and occupancy', listed?.host?.uid === a.uid && listed?.memberCount === 1 && listed?.capacity === 6, listed ? `${listed.host?.displayName} · ${listed.memberCount}/${listed.capacity}` : '');
     const missing = await api(b.token, 'POST', '/v1/rooms/ROOM-0000-00/join');
     report('joining a closed R.O.O.M. → 404 ROOM_NOT_FOUND', missing.status === 404 && missing.body?.code === 'ROOM_NOT_FOUND');
     const joinB = await api(b.token, 'POST', `/v1/rooms/${joinA.body?.roomId}/join`);

@@ -11,7 +11,8 @@
     "pretypecheck": "pnpm --filter @workspace/firebase run build && pnpm --filter @workspace/api-zod run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test src/validation/validation.engine.test.ts",
-    "e2e": "node scripts/e2e-smoke.mjs"
+    "e2e": "node scripts/e2e-smoke.mjs",
+    "admin:grant": "node scripts/grant-admin.mjs"
   },
   "dependencies": {
     "@google-cloud/translate": "^10.1.1",

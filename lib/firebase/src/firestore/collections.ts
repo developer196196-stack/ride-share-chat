@@ -3,6 +3,10 @@ export const FirestoreCollections = {
   shareLinks: 'shareLinks',
   safetyAlerts: 'safetyAlerts',
   reports: 'reports',
+  /** `admins/{uid}` — who may use the admin panel. */
+  admins: 'admins',
+  /** `appConfig/{name}` — settings changed from the admin panel (e.g. `validation`). */
+  appConfig: 'appConfig',
 } as const;
 
 /** Subcollections of `users/{uid}`. */

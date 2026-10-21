@@ -12,7 +12,7 @@ import { validationError } from '../common/zod-parse';
 import { REDIS } from '../redis/redis.module';
 import { RealtimeService } from '../realtime/realtime.service';
 import { ServerEvents } from '../realtime/realtime.events';
-import { relaxedValidationOverrides, ValidationConfig as C } from './validation.config';
+import { ValidationConfig as C } from './validation.config';
 import {
   applyRoadCheck,
   createInitialState,
@@ -79,12 +79,6 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    const relaxed = relaxedValidationOverrides();
-    if (relaxed.length > 0) {
-      this.logger.warn(
-        `Trip Validation is using NON-PRODUCTION thresholds (${relaxed.join(', ')}). Remove these VALIDATION_* overrides before launch.`,
-      );
-    }
     if (this.redis) {
       this.sweepTimer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
     }

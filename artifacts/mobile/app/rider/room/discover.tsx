@@ -166,7 +166,8 @@ export default function DiscoverScreen() {
   const [error, setError] = useState<string | null>(null);
   const [gridWidth, setGridWidth] = useState(0);
 
-  const verified = state === 'VERIFIED';
+  // Traffic grace (stopped mid-ride) still counts as verified here: no banner, rooms stay usable.
+  const verified = state === 'VERIFIED' || state === 'GRACE';
   const busy = hostRoom.isPending || joinRoom.isPending;
   const rooms = grid.data?.rooms ?? [];
   const liveRooms = grid.data?.liveRooms ?? 0;
@@ -243,9 +244,7 @@ export default function DiscoverScreen() {
           <Pressable style={styles.verifyBanner} onPress={() => router.push(routes.validation)}>
             <Icon name="solarCarLinear" size={18} color={colors.chart3} />
             <Text style={styles.verifyText}>
-              {state === 'GRACE'
-                ? 'Vehicle stopped — your trip resumes once you are moving again.'
-                : `Waiting for your ride to start${speedMph > 0 ? ` (${Math.round(speedMph)} MPH)` : ''}. Rooms open once you're verified — tap for details.`}
+              {`Waiting for your ride to start${speedMph > 0 ? ` (${Math.round(speedMph)} MPH)` : ''}. Rooms open once you're verified — tap for details.`}
             </Text>
           </Pressable>
         ) : null}
@@ -310,7 +309,7 @@ export default function DiscoverScreen() {
         </BlurView>
       </View>
 
-      <SafetyFab style={{ bottom: TAB_BAR_HEIGHT + DOCK_CLEARANCE + insets.bottom + 4 }} />
+      {/* Hidden for now; uncomment to restore. <SafetyFab style={{ bottom: TAB_BAR_HEIGHT + DOCK_CLEARANCE + insets.bottom + 4 }} /> */}
       <OptionSheet
         visible={hostOpen}
         title="Pick your room's mood"

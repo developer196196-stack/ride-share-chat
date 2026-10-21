@@ -100,7 +100,8 @@ function ringFor(
         caption: `${Math.round(speedMph)} MPH · ${powerSaver ? 'battery saver on' : 'in transit'}`,
       };
     case 'GRACE':
-      return { tone: 'stopped', title: 'Vehicle stopped', caption: 'Your seat is held while traffic clears' };
+      // Quiet on purpose: city rides stop at every light, so no amber alarm.
+      return { tone: 'verified', title: "You're verified", caption: 'Stopped · your seat is held' };
     case 'POST_RIDE':
       return { tone: 'stopped', title: 'Ride ended', caption: 'Your R.O.O.M. stays live for a few minutes' };
     case 'TERMINATED':
@@ -381,7 +382,7 @@ export default function TripValidationScreen() {
         />
         <Text style={styles.footnote}>Telemetry runs exclusively while actively commuting.</Text>
       </Screen>
-      <SafetyFab style={styles.fab} />
+      {/* Hidden for now; uncomment to restore. <SafetyFab style={styles.fab} /> */}
       <SafetySheet visible={shareOpen} onClose={() => setShareOpen(false)} />
     </View>
   );

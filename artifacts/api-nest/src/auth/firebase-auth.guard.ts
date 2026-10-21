@@ -1,16 +1,21 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import type Redis from 'ioredis';
 import type { DecodedIdToken } from '@workspace/firebase';
 import { verifyIdToken } from '@workspace/firebase';
 import { FIREBASE_CONFIGURED } from '../firebase/firebase.tokens';
 import type { ErrorResponseBody } from '../common/error-response';
+import { isSuspended, SUSPENDED_MESSAGE } from '../common/suspension';
+import { REDIS } from '../redis/redis.module';
 
 export type AuthenticatedRequest = {
   headers: { authorization?: string };
@@ -23,6 +28,7 @@ export class FirebaseAuthGuard implements CanActivate {
 
   constructor(
     @Inject(FIREBASE_CONFIGURED) private readonly firebaseConfigured: boolean,
+    @Optional() @Inject(REDIS) private readonly redis: Redis | null = null,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -56,9 +62,9 @@ export class FirebaseAuthGuard implements CanActivate {
       throw new UnauthorizedException(body);
     }
 
+    let decoded: DecodedIdToken;
     try {
-      request.user = await verifyIdToken(token);
-      return true;
+      decoded = await verifyIdToken(token);
     } catch (error) {
       this.logger.warn(
         `AUTH_UNAUTHORIZED — verifyIdToken failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -69,5 +75,12 @@ export class FirebaseAuthGuard implements CanActivate {
       };
       throw new UnauthorizedException(body);
     }
+
+    if (await isSuspended(this.redis, decoded.uid)) {
+      const body: ErrorResponseBody = { code: 'ACCOUNT_SUSPENDED', message: SUSPENDED_MESSAGE };
+      throw new ForbiddenException(body);
+    }
+    request.user = decoded;
+    return true;
   }
 }
