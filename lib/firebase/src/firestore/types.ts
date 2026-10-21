@@ -20,8 +20,18 @@ export type UserDoc = {
   profileCompletedAt: Timestamp | null;
   /** Language, translation, subtitle and safety preferences (absent until first saved). */
   preferences?: UserPreferencesDoc;
+  /** Suspended from the admin panel (missing = active). */
+  suspended?: boolean;
+  suspendedAt?: Timestamp | null;
+  suspendedReason?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+};
+
+/** `admins/{uid}` — admin panel access (email + password Firebase accounts). */
+export type AdminDoc = {
+  email: string;
+  createdAt: Timestamp;
 };
 
 export type UserPreferencesDoc = {
@@ -75,6 +85,9 @@ export type ReportDoc = {
   recentMessages: { senderId: string; text: string; sentAt: string }[];
   status: 'open' | 'reviewed';
   createdAt: Timestamp;
+  reviewedAt?: Timestamp | null;
+  reviewedBy?: string | null;
+  reviewNote?: string | null;
 };
 
 /** `users/{uid}/rides/{id}` — one validated ride session. */

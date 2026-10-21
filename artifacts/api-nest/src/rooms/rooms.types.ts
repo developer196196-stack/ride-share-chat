@@ -2,8 +2,8 @@
 export const VIBES = ['party_mode', 'networking', 'deep_talks', 'just_chilling'] as const;
 export type Vibe = (typeof VIBES)[number];
 
-/** 9 seats including the rider. */
-export const ROOM_CAPACITY = 9;
+/** 6 seats including the host (client request: host + 5 riders). */
+export const ROOM_CAPACITY = 6;
 
 /** auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid). */
 export type RoomMatching = 'auto' | 'manual';

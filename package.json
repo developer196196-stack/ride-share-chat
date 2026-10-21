@@ -16,6 +16,8 @@
     "build:apk": "pnpm --filter @workspace/mobile run build:apk",
     "build:ios": "pnpm --filter @workspace/mobile run build:ios",
     "api-nest": "pnpm --filter @workspace/api-nest run dev",
+    "admin": "pnpm --filter @workspace/admin-web run dev",
+    "admin:grant": "pnpm --filter @workspace/api-nest run admin:grant",
     "codegen": "pnpm --filter @workspace/api-spec run codegen",
     "test": "pnpm --filter @workspace/api-nest run test && pnpm --filter @workspace/mobile run test",
     "e2e": "pnpm --filter @workspace/api-nest run e2e",

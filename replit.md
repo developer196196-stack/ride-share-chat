@@ -24,9 +24,18 @@ _Replace the heading above with the project's name, and this line with one sente
 - Video, sensors and in-vehicle detection need a development build (`eas build --profile development`); Expo Go and web fall back to avatar tiles and no OS activity.
 - Dev ride simulator: `EXPO_PUBLIC_ALLOW_SIMULATED_RIDE=true` (app) + `VALIDATION_ALLOW_SIMULATED=true` (API).
 
+### Admin panel (`artifacts/admin-web`, Next.js)
+
+- `pnpm run admin` — admin console on http://localhost:3010 (`/api/*` is proxied to api-nest on `API_PORT`, default 5001)
+- `pnpm run admin:grant -- <email> <password>` — create an admin (email/password Firebase account + `admins/{uid}`); `-- <email> --revoke` removes access
+- One-time: Firebase Console → Authentication → Sign-in method → enable **Email/Password**; copy `artifacts/admin-web/env.template` to `.env` (same Firebase web values as the mobile app, prefixed `NEXT_PUBLIC_`)
+- Pages: Overview, Riders (search, detail, suspend/reinstate), Reports (rider reports + silent host flags, mark reviewed), Live Rooms (close a room), Safety Alerts, Trip Validation (every threshold plus the "Next" block time — the only place they are set; saved in Firestore `appConfig/validation`, picked up by every API instance within a minute; unset = production default)
+- API: `/api/v1/admin/*` (`artifacts/api-nest/src/admin`), guarded by FirebaseAuthGuard + AdminGuard (`admins/{uid}`, no dev bypass). Not part of the rider OpenAPI contract.
+- Suspension: Firestore `users/{uid}.suspended` + Redis set `suspended` (checked on every request and socket) + Firebase Auth account disabled.
+
 ### Environment variables
 
-Templates: `artifacts/api-nest/env.template` and `artifacts/mobile/env.template` — copy each to `.env` locally. On Replit use the Secrets panel.
+Templates: `artifacts/api-nest/env.template`, `artifacts/mobile/env.template` and `artifacts/admin-web/env.template` — copy each to `.env` locally. On Replit use the Secrets panel.
 
 | Name | Used by | Purpose |
 |------|---------|---------|
@@ -39,7 +48,7 @@ Templates: `artifacts/api-nest/env.template` and `artifacts/mobile/env.template`
 | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | api-nest | Video R.O.O.M.s |
 | `PUBLIC_BASE_URL` | api-nest | Optional origin for share links (defaults to request host) |
 | `VALIDATION_ALLOW_SIMULATED` | api-nest | Optional, dev only: accept simulated rides |
-| `VALIDATION_*` thresholds | api-nest | Optional engine tuning (entry/grace speed, scores, weights, spoof checks). Unset = production defaults; see `artifacts/api-nest/env.template` for the desk-testing preset |
+| ~~`VALIDATION_*` thresholds, `ROOM_SKIP_BLOCK_SEC`~~ | — | **Not env any more.** Managed only from the admin panel → Trip Validation (Firestore `appConfig/validation`); the API ignores them in `.env` and warns at startup |
 | `CORS_ORIGINS`, `SWAGGER_ENABLED` | api-nest | Optional |
 | `EXPO_PUBLIC_API_URL` | mobile | Local API URL (not needed on Replit) |
 | `EXPO_PUBLIC_FIREBASE_API_KEY` / `_AUTH_DOMAIN` / `_PROJECT_ID` / `_MESSAGING_SENDER_ID` / `_APP_ID` | mobile | Firebase web app config for phone sign-in |

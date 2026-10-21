@@ -58,7 +58,8 @@ export default function VibeSelectionScreen() {
   const current: Vibe = selected ?? recommended;
   const currentOption = vibeOption(current);
   const recommendedOption = vibeOption(recommended);
-  const verified = state === 'VERIFIED';
+  // Traffic grace (stopped mid-ride) still counts as verified.
+  const verified = state === 'VERIFIED' || state === 'GRACE';
   const totalRooms = (vibes.data ?? []).reduce((a, v) => a + v.rooms, 0);
 
   const enter = async () => {
@@ -158,7 +159,7 @@ export default function VibeSelectionScreen() {
             <Text style={styles.selectionMeta}>{plural(stats.get(current)?.riders ?? 0, 'rider')} now</Text>
           </View>
           <Text style={styles.selectionBody}>{joinPreview(stats.get(current))}</Text>
-          <Text style={styles.selectionNote}>Each R.O.O.M. seats up to 9 verified riders and backfills as people reach their drop-off.</Text>
+          <Text style={styles.selectionNote}>Each R.O.O.M. seats up to 6 verified riders and backfills as people reach their drop-off.</Text>
         </Card>
 
         {!verified ? (
@@ -197,7 +198,7 @@ export default function VibeSelectionScreen() {
           />
         )}
       </Screen>
-      <SafetyFab style={styles.fab} />
+      {/* Hidden for now; uncomment to restore. <SafetyFab style={styles.fab} /> */}
     </View>
   );
 }

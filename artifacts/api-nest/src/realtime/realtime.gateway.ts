@@ -1,4 +1,5 @@
-import { HttpException, Logger } from '@nestjs/common';
+import { HttpException, Inject, Logger } from '@nestjs/common';
+import type Redis from 'ioredis';
 import {
   ConnectedSocket,
   MessageBody,
@@ -12,6 +13,8 @@ import { verifyIdToken } from '@workspace/firebase';
 import { CreateSafetyAlertBody, SubmitTelemetryBody } from '@workspace/api-zod';
 import { loadAppConfig } from '../config/configuration';
 import { resolvePublicBaseUrl } from '../common/public-base-url';
+import { isSuspended, SUSPENDED_MESSAGE } from '../common/suspension';
+import { REDIS } from '../redis/redis.module';
 import { ChatService } from '../chat/chat.service';
 import { SafetyService } from '../safety/safety.service';
 import { ValidationService } from '../validation/validation.service';
@@ -53,6 +56,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     private readonly validation: ValidationService,
     private readonly chat: ChatService,
     private readonly safety: SafetyService,
+    @Inject(REDIS) private readonly redis: Redis | null,
   ) {}
 
   afterInit(server: Server): void {
@@ -68,6 +72,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     }
     try {
       const decoded = await verifyIdToken(token);
+      if (await isSuspended(this.redis, decoded.uid)) {
+        client.emit('AUTH_ERROR', { code: 'ACCOUNT_SUSPENDED', message: SUSPENDED_MESSAGE });
+        client.disconnect(true);
+        return;
+      }
       client.data.uid = decoded.uid;
       await client.join(RealtimeService.userRoom(decoded.uid));
       // Send the current state straight away so the app can render without a REST call.

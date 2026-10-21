@@ -23,7 +23,8 @@ function releaseKeepAwake(): void {
 
 /**
  * Runs the telemetry collector while a trip is active and handles trip-wide navigation:
- * GRACE inside a R.O.O.M. opens the Traffic Grace screen; TERMINATED ends on the Ride Summary.
+ * TERMINATED ends on the Ride Summary. Traffic grace is deliberately quiet (client feedback: city
+ * rides stop at every light) — only the small grace chip in the room header shows it.
  * Renders nothing.
  */
 export function TripSessionHost() {
@@ -71,13 +72,6 @@ export function TripSessionHost() {
   useEffect(() => {
     collector.current?.setMode(inRoom ? 'in_room' : 'pre_verification');
   }, [inRoom]);
-
-  // Traffic grace overlay while in a room.
-  useEffect(() => {
-    if (state === 'GRACE' && inRoom && pathname === routes.activeRoom) {
-      router.push(routes.trafficGrace);
-    }
-  }, [state, inRoom, pathname, router]);
 
   // Termination → ride summary.
   useEffect(() => {

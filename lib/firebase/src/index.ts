@@ -24,6 +24,7 @@ export type {
   SafetyAlertDoc,
   ReportDoc,
   RideDoc,
+  AdminDoc,
 } from './firestore/types';
 export { getAuth, verifyIdToken, type DecodedIdToken } from './auth/verify';
 export {

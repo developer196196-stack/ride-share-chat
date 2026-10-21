@@ -18,8 +18,6 @@ const envSchema = z.object({
   LIVEKIT_API_SECRET: optionalString,
   /** Accept `simulated: true` telemetry (dev builds / emulators). Never enable in production. */
   VALIDATION_ALLOW_SIMULATED: optionalString,
-  /** Seconds "Next" keeps skipped riders apart (default 3600). Use a small value while testing with two devices. */
-  ROOM_SKIP_BLOCK_SEC: z.coerce.number().int().min(0).max(24 * 60 * 60).default(60 * 60),
 });
 
 export type AppConfig = z.infer<typeof envSchema> & {
