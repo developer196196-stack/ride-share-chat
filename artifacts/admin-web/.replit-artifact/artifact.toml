@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/"
+previewPath = "/admin"
 title = "Rideshare Chats Admin"
 description = "Operations console for Rideshare Chats: riders, reports, live rooms, safety alerts and Trip Validation settings."
 version = "1.0.0"
@@ -8,7 +8,7 @@ router = "path"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/admin" ]
 localPort = 24276
 
 [services.development]
@@ -30,7 +30,7 @@ PORT = "24276"
 NODE_ENV = "production"
 
 [services.production.health.startup]
-path = "/"
+path = "/admin"
 
 [services.env]
 PORT = "24276"

@@ -15,7 +15,11 @@ for (const domain of [
 const apiPort = process.env.API_PORT || (process.env.REPLIT_DEV_DOMAIN ? "8080" : "5001");
 
 const nextConfig: NextConfig = {
+  basePath: "/admin",
   allowedDevOrigins,
+  env: {
+    NEXT_PUBLIC_ADMIN_BASE_PATH: "/admin",
+  },
   async rewrites() {
     return [
       {

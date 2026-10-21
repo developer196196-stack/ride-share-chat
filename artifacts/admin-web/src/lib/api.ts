@@ -18,7 +18,7 @@ export async function adminApi<T>(path: string, init: { method?: string; body?: 
   const user = auth.currentUser;
   if (!user) throw new ApiError('You are signed out.', 401, 'AUTH_UNAUTHORIZED');
   const token = await user.getIdToken();
-  const res = await fetch(`/api/v1/admin${path}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_BASE_PATH ?? ""}/api/v1/admin${path}`, {
     method: init.method ?? 'GET',
     headers: {
       Authorization: `Bearer ${token}`,

@@ -1,3 +1,4 @@
 - [Rideshare frontend framework](rideshare-frontend-framework.md) — preserve the targeted app's framework; the legacy web prototype and imported Expo app are separate.
 - [Workspace test tooling installs](workspace-test-tooling.md) — package installer cannot pass pnpm workspace-root flags; use an explicit root-scoped install for shared test tools.
 - [Expo patch validation](expo-patch-validation.md) — validation can recommend patches too new for the security window; respect the policy and verify the actual preview.
+- [Admin preview isolation](admin-preview-isolation.md) — keep the admin console separate from the existing rider root preview.
