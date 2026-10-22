@@ -603,67 +603,6 @@ export class RoomsService implements OnModuleInit {
     return session;
   }
 
-  // ---------------------------------------------------------------- admin
-
-  /** Every live room with its members (admin panel). */
-  async adminListRooms(): Promise<
-    {
-      roomId: string;
-      vibe: Vibe;
-      hostUid: string | null;
-      matching: RoomMatching;
-      locked: boolean;
-      createdAt: string;
-      members: { uid: string; displayName: string; photoUrl: string | null; isHost: boolean }[];
-    }[]
-  > {
-    const ids = (await Promise.all(VIBES.map((vibe) => this.redis.smembers(keys.all(vibe))))).flat();
-    const rooms = await Promise.all(
-      ids.map(async (roomId) => {
-        const [meta, members] = await Promise.all([
-          this.redis.hgetall(keys.room(roomId)) as Promise<RoomMeta>,
-          this.roomMembers(roomId),
-        ]);
-        return { roomId, meta, members };
-      }),
-    );
-    const live = rooms.filter((r) => r.meta.vibe && r.members.length > 0);
-    const profiles = await this.profiles.getMany([...new Set(live.flatMap((r) => r.members))]);
-    return live
-      .map(({ roomId, meta, members }) => ({
-        roomId,
-        vibe: meta.vibe as Vibe,
-        hostUid: meta.hostUid ?? null,
-        matching: (meta.matching === 'manual' ? 'manual' : 'auto') as RoomMatching,
-        locked: meta.locked === '1',
-        createdAt: new Date(Number(meta.createdAt ?? Date.now())).toISOString(),
-        members: members.map((uid) => ({
-          uid,
-          displayName: profiles.get(uid)?.displayName ?? 'Rider',
-          photoUrl: profiles.get(uid)?.photoUrl ?? null,
-          isHost: uid === meta.hostUid,
-        })),
-      }))
-      .sort((a, b) => b.members.length - a.members.length);
-  }
-
-  /** Admin: remove everyone from a room (it closes when empty). Their rides go on. */
-  async adminCloseRoom(roomId: string, message: string): Promise<{ removed: number }> {
-    const members = await this.roomMembers(roomId);
-    for (const uid of members) {
-      await this.leaveRoom(uid);
-      this.realtime.emitToUser(uid, ServerEvents.ROOM_EJECTED, { roomId, message });
-    }
-    return { removed: members.length };
-  }
-
-  /** Admin suspension: out of any room and the ride ends. */
-  async adminEndForSuspension(uid: string): Promise<void> {
-    await this.leaveRoom(uid).catch(() => null);
-    await this.validation.end(uid).catch(() => null);
-    await this.redis.del(keys.session(uid), keys.peers(uid)).catch(() => 0);
-  }
-
   // ---------------------------------------------------------------- friends: live rooms, invites, requests
 
   /** Current room for each rider (only riders in a room are in the map). */

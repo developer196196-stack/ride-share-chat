@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Car, Flag, Gauge, Radio, ShieldAlert, UserX, Users } from 'lucide-react';
+import { ArrowRight, Car, Gauge, Radio, UserX, Users } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { VIBE_LABELS } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,6 @@ type Stats = {
   totalRiders: number;
   newRiders7d: number;
   suspended: number;
-  openReports: number;
-  safetyAlerts24h: number;
   liveRooms: number;
   ridersInRooms: number;
   verifiedNow: number;
@@ -31,9 +29,7 @@ export default function OverviewPage() {
   const cards = [
     { title: 'Riders', value: data?.totalRiders, desc: `${data?.newRiders7d ?? 0} joined in the last 7 days`, icon: Users, href: '/dashboard/riders' },
     { title: 'Verified right now', value: data?.verifiedNow, desc: `${data?.onHold ?? 0} in traffic grace or post-ride`, icon: Car, href: '/dashboard/riders' },
-    { title: 'Live rooms', value: data?.liveRooms, desc: `${data?.ridersInRooms ?? 0} riders in rooms`, icon: Radio, href: '/dashboard/rooms' },
-    { title: 'Open reports', value: data?.openReports, desc: 'Waiting for review', icon: Flag, href: '/dashboard/reports', alert: (data?.openReports ?? 0) > 0 },
-    { title: 'Safety alerts (24h)', value: data?.safetyAlerts24h, desc: 'Trip shares and emergencies', icon: ShieldAlert, href: '/dashboard/safety', alert: (data?.safetyAlerts24h ?? 0) > 0 },
+    { title: 'Live rooms', value: data?.liveRooms, desc: `${data?.ridersInRooms ?? 0} riders in rooms`, icon: Radio, href: null },
     { title: 'Suspended riders', value: data?.suspended, desc: 'Blocked from the app', icon: UserX, href: '/dashboard/riders' },
   ];
 
@@ -57,22 +53,27 @@ export default function OverviewPage() {
         </Alert>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
-          return (
+          const body = (
+            <Card className={`h-full ${card.href ? 'transition-colors hover:border-primary/40' : ''}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {ready ? <div className="text-3xl font-bold">{card.value ?? 0}</div> : <Skeleton className="h-9 w-16" />}
+                <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
+              </CardContent>
+            </Card>
+          );
+          return card.href ? (
             <Link key={card.title} href={card.href} className="block">
-              <Card className="h-full transition-colors hover:border-primary/40">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-                  <Icon className={`h-4 w-4 ${card.alert ? 'text-primary' : 'text-muted-foreground'}`} />
-                </CardHeader>
-                <CardContent>
-                  {ready ? <div className="text-3xl font-bold">{card.value ?? 0}</div> : <Skeleton className="h-9 w-16" />}
-                  <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
-                </CardContent>
-              </Card>
+              {body}
             </Link>
+          ) : (
+            <div key={card.title}>{body}</div>
           );
         })}
       </div>
@@ -103,9 +104,7 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {[
-              { href: '/dashboard/reports', label: 'Review open reports' },
               { href: '/dashboard/riders', label: 'Find a rider' },
-              { href: '/dashboard/rooms', label: 'Watch live rooms' },
               { href: '/dashboard/settings', label: 'Tune Trip Validation' },
             ].map(({ href, label }) => (
               <Button key={href} variant="outline" className="w-full justify-between" asChild>

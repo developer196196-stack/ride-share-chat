@@ -8,7 +8,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import type Redis from 'ioredis';
-import type { Firestore, Query, QueryDocumentSnapshot, Timestamp as FsTimestamp } from 'firebase-admin/firestore';
+import type { Firestore, Query, Timestamp as FsTimestamp } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import {
   FirestoreCollections,
@@ -16,19 +16,15 @@ import {
   FOLLOWING_SUBCOLLECTION,
   getAuth,
   RIDES_SUBCOLLECTION,
-  type ReportDoc,
   type RideDoc,
-  type SafetyAlertDoc,
   type UserDoc,
 } from '@workspace/firebase';
 import type { ErrorResponseBody } from '../common/error-response';
 import { requireFirestore } from '../common/require-firestore';
-import { SUSPENDED_MESSAGE, SUSPENDED_SET } from '../common/suspension';
+import { SUSPENDED_SET } from '../common/suspension';
 import { FIRESTORE } from '../firebase/firebase.tokens';
 import { ProfilesService } from '../profiles/profiles.service';
 import { REDIS } from '../redis/redis.module';
-import { ServerEvents } from '../realtime/realtime.events';
-import { RealtimeService } from '../realtime/realtime.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { getValidationOverrides, relaxedValidationOverrides, setValidationOverrides } from '../validation/validation.config';
 import { ValidationService } from '../validation/validation.service';
@@ -48,7 +44,7 @@ function notFound(message: string): never {
 
 type LiveState = { validationState: string | null; roomId: string | null };
 
-/** Admin panel: riders, reports, live rooms, safety alerts and Trip Validation settings. */
+/** Admin panel: overview, riders (read-only) and Trip Validation settings. */
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AdminService.name);
@@ -60,7 +56,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     private readonly profiles: ProfilesService,
     private readonly rooms: RoomsService,
     private readonly validation: ValidationService,
-    private readonly realtime: RealtimeService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -127,12 +122,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async stats() {
     const now = Date.now();
     const count = async (query: Query) => (await query.count().get()).data().count;
-    const [totalRiders, newRiders7d, suspended, openReports, safetyAlerts24h, vibes, verifiedNow, onHold] = await Promise.all([
+    const [totalRiders, newRiders7d, suspended, vibes, verifiedNow, onHold] = await Promise.all([
       count(this.users()),
       count(this.users().where('createdAt', '>=', Timestamp.fromMillis(now - 7 * DAY_MS))),
       count(this.users().where('suspended', '==', true)),
-      count(this.db.collection(FirestoreCollections.reports).where('status', '==', 'open')),
-      count(this.db.collection(FirestoreCollections.safetyAlerts).where('createdAt', '>=', Timestamp.fromMillis(now - DAY_MS))),
       this.redis ? this.rooms.vibeStats() : Promise.resolve([]),
       this.redis ? this.redis.zcard('val:seen') : Promise.resolve(0),
       this.redis ? this.redis.zcard('val:grace') : Promise.resolve(0),
@@ -141,8 +134,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       totalRiders,
       newRiders7d,
       suspended,
-      openReports,
-      safetyAlerts24h,
       liveRooms: vibes.reduce((a, v) => a + v.rooms, 0),
       ridersInRooms: vibes.reduce((a, v) => a + v.riders, 0),
       verifiedNow,
@@ -202,23 +193,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const doc = await this.users().doc(uid).get();
     if (!doc.exists) notFound('That rider does not exist.');
     const data = doc.data() as UserDoc;
-    const reports = this.db.collection(FirestoreCollections.reports);
-    const [profile, ridesSnap, against, by, followers, following, snapshot, liveRooms, authUser] = await Promise.all([
+    const [profile, ridesSnap, followers, following, snapshot, liveRooms, authUser] = await Promise.all([
       this.profiles.getMany([uid]).then((m) => m.get(uid)),
       this.users().doc(uid).collection(RIDES_SUBCOLLECTION).orderBy('endedAt', 'desc').limit(20).get(),
-      reports.where('reportedUid', '==', uid).limit(50).get(),
-      reports.where('reporterUid', '==', uid).limit(50).get(),
       this.users().doc(uid).collection(FOLLOWERS_SUBCOLLECTION).count().get(),
       this.users().doc(uid).collection(FOLLOWING_SUBCOLLECTION).count().get(),
       this.redis ? this.validation.getSnapshot(uid).catch(() => null) : Promise.resolve(null),
       this.redis ? this.rooms.liveRooms([uid]) : Promise.resolve(new Map()),
       getAuth().getUser(uid).catch(() => null),
     ]);
-    const toReport = (d: QueryDocumentSnapshot) => {
-      const r = d.data() as ReportDoc;
-      return { id: d.id, reason: r.reason, source: r.source ?? 'rider_report', status: r.status, details: r.details, createdAt: iso(r.createdAt) };
-    };
-    const byDate = (a: { createdAt: string | null }, b: { createdAt: string | null }) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
     return {
       uid,
       displayName: data.displayName,
@@ -254,99 +237,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           endReason: r.endReason,
         };
       }),
-      reportsAgainst: against.docs.map(toReport).sort(byDate),
-      reportsBy: by.docs.map(toReport).sort(byDate),
     };
-  }
-
-  /** Suspend: API and sockets refuse the account, Firebase sign-in is disabled, the ride ends. */
-  async suspend(uid: string, reason: string | null, adminEmail: string | null) {
-    const ref = this.users().doc(uid);
-    if (!(await ref.get()).exists) notFound('That rider does not exist.');
-    await ref.update({ suspended: true, suspendedAt: Timestamp.now(), suspendedReason: reason?.trim() || null, updatedAt: Timestamp.now() });
-    if (this.redis) {
-      await this.redis.sadd(SUSPENDED_SET, uid);
-      await this.rooms.adminEndForSuspension(uid);
-    }
-    await getAuth().updateUser(uid, { disabled: true }).catch((e: unknown) => this.logger.warn(`Disable auth user ${uid}: ${String(e)}`));
-    await getAuth().revokeRefreshTokens(uid).catch(() => undefined);
-    this.realtime.emitToUser(uid, ServerEvents.SESSION_TERMINATED, { reason: 'account_suspended', message: SUSPENDED_MESSAGE });
-    this.realtime.disconnectUser(uid);
-    this.logger.log(`Rider ${uid} suspended by ${adminEmail ?? 'admin'}${reason ? `: ${reason}` : ''}`);
-    return { ok: true };
-  }
-
-  async reinstate(uid: string, adminEmail: string | null) {
-    const ref = this.users().doc(uid);
-    if (!(await ref.get()).exists) notFound('That rider does not exist.');
-    await ref.update({ suspended: false, suspendedAt: null, suspendedReason: null, updatedAt: Timestamp.now() });
-    if (this.redis) await this.redis.srem(SUSPENDED_SET, uid);
-    await getAuth().updateUser(uid, { disabled: false }).catch((e: unknown) => this.logger.warn(`Enable auth user ${uid}: ${String(e)}`));
-    this.logger.log(`Rider ${uid} reinstated by ${adminEmail ?? 'admin'}`);
-    return { ok: true };
-  }
-
-  // ---------------------------------------------------------------- reports
-
-  async listReports(status: 'open' | 'reviewed' | 'all') {
-    const snap = await this.db.collection(FirestoreCollections.reports).orderBy('createdAt', 'desc').limit(300).get();
-    const reports = snap.docs
-      .map((d) => ({ id: d.id, ...(d.data() as ReportDoc) }))
-      .filter((r) => status === 'all' || r.status === status);
-    const ids = [...new Set(reports.flatMap((r) => [r.reporterUid, r.reportedUid].filter((x): x is string => Boolean(x))))];
-    const profiles = await this.profiles.getMany(ids);
-    const name = (uid: string | null) => (uid ? (profiles.get(uid)?.displayName ?? 'Rider') : null);
-    return reports.map((r) => ({
-      id: r.id,
-      source: r.source ?? 'rider_report',
-      reason: r.reason,
-      details: r.details,
-      status: r.status,
-      roomId: r.roomId,
-      reporterUid: r.reporterUid,
-      reporterName: name(r.reporterUid),
-      reportedUid: r.reportedUid,
-      reportedName: name(r.reportedUid),
-      recentMessages: r.recentMessages ?? [],
-      createdAt: iso(r.createdAt),
-      reviewedAt: iso(r.reviewedAt ?? null),
-      reviewedBy: r.reviewedBy ?? null,
-      reviewNote: r.reviewNote ?? null,
-    }));
-  }
-
-  async reviewReport(id: string, note: string | null, adminEmail: string | null) {
-    const ref = this.db.collection(FirestoreCollections.reports).doc(id);
-    if (!(await ref.get()).exists) notFound('That report does not exist.');
-    await ref.update({ status: 'reviewed', reviewedAt: Timestamp.now(), reviewedBy: adminEmail, reviewNote: note?.trim() || null });
-    return { ok: true };
-  }
-
-  // ---------------------------------------------------------------- live rooms & safety alerts
-
-  listRooms() {
-    return this.rooms.adminListRooms();
-  }
-
-  closeRoom(roomId: string) {
-    return this.rooms.adminCloseRoom(roomId, 'This R.O.O.M. was closed by a moderator. Pick another room to keep chatting.');
-  }
-
-  async listSafetyAlerts() {
-    const snap = await this.db.collection(FirestoreCollections.safetyAlerts).orderBy('createdAt', 'desc').limit(200).get();
-    const alerts = snap.docs.map((d) => ({ id: d.id, ...(d.data() as SafetyAlertDoc) }));
-    const profiles = await this.profiles.getMany([...new Set(alerts.map((a) => a.uid))]);
-    return alerts.map((a) => ({
-      id: a.id,
-      uid: a.uid,
-      riderName: profiles.get(a.uid)?.displayName ?? 'Rider',
-      kind: a.kind,
-      location: a.location,
-      validationState: a.validationState,
-      roomId: a.roomId,
-      shareToken: a.shareToken,
-      createdAt: iso(a.createdAt),
-    }));
   }
 
   // ---------------------------------------------------------------- Trip Validation settings
