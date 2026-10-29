@@ -1,18 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Ban, Copy, Phone } from 'lucide-react';
+import { ArrowLeft, Ban, Copy, Phone, RotateCcw } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { formatDate, formatDuration, VIBE_LABELS } from '@/lib/api';
-import { copyText } from '@/lib/rider-actions';
+import { copyText, reinstateRider, suspendRider } from '@/lib/rider-actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ErrorAlert, initials, StatusBadge, TableEmpty, TripBadge } from '@/components/page-header';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { ConfirmDialog, ErrorAlert, initials, StatusBadge, TableEmpty, TripBadge } from '@/components/page-header';
+
+type ReportRow = { id: string; reason: string; source: string; status: string; details: string | null; createdAt: string | null };
 
 type RiderDetail = {
   uid: string;
@@ -46,6 +51,8 @@ type RiderDetail = {
     vibe: string | null;
     endReason: string;
   }[];
+  reportsAgainst: ReportRow[];
+  reportsBy: ReportRow[];
 };
 
 const END_REASONS: Record<string, string> = {
@@ -65,9 +72,44 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function ReportsTable({ rows, empty }: { rows: ReportRow[]; empty: string }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="pl-6">When</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead className="pr-6">Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableEmpty columns={4} message={empty} />
+        ) : (
+          rows.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell className="pl-6 text-muted-foreground whitespace-nowrap">{formatDate(r.createdAt)}</TableCell>
+              <TableCell>
+                {r.reason.replace(/_/g, ' ')}
+                {r.details ? <span className="text-muted-foreground"> — {r.details}</span> : null}
+              </TableCell>
+              <TableCell>{r.source === 'host_flag' ? <StatusBadge tone="info">Host flag</StatusBadge> : <StatusBadge tone="secondary">Rider report</StatusBadge>}</TableCell>
+              <TableCell className="pr-6">{r.status === 'open' ? <StatusBadge tone="warning">Open</StatusBadge> : <StatusBadge tone="success">Reviewed</StatusBadge>}</TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
 export default function RiderDetailPage() {
   const { uid } = useParams<{ uid: string }>();
   const { data, error, loading, reload } = useAdminQuery<RiderDetail>(`/users/${uid}`, 20_000);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
 
   if (loading && !data) {
     return (
@@ -111,6 +153,23 @@ export default function RiderDetailPage() {
               <Phone className="mr-1.5 h-4 w-4" /> Copy phone
             </Button>
           ) : null}
+          {data.suspended ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                if (await reinstateRider(data.uid)) await reload();
+                setBusy(false);
+              }}
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" /> Reinstate
+            </Button>
+          ) : (
+            <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
+              <Ban className="mr-1.5 h-4 w-4" /> Suspend
+            </Button>
+          )}
         </div>
       </div>
 
@@ -171,6 +230,9 @@ export default function RiderDetailPage() {
                     {VIBE_LABELS[data.liveRoom.vibe] ?? data.liveRoom.vibe} · {data.liveRoom.memberCount}/{data.liveRoom.capacity}
                     {data.liveRoom.isHost ? ' · hosting' : ''}
                   </p>
+                  <Button variant="link" size="sm" className="px-0 h-auto" asChild>
+                    <Link href="/dashboard/rooms">Open Live Rooms</Link>
+                  </Button>
                 </div>
               ) : (
                 'Not in a room'
@@ -221,6 +283,44 @@ export default function RiderDetailPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <Tabs defaultValue="against">
+          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Reports</CardTitle>
+              <CardDescription>Reports about this rider and reports they made</CardDescription>
+            </div>
+            <TabsList>
+              <TabsTrigger value="against">Against ({data.reportsAgainst.length})</TabsTrigger>
+              <TabsTrigger value="by">Made ({data.reportsBy.length})</TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          <CardContent className="p-0">
+            <TabsContent value="against" className="m-0">
+              <ReportsTable rows={data.reportsAgainst} empty="No one has reported this rider." />
+            </TabsContent>
+            <TabsContent value="by" className="m-0">
+              <ReportsTable rows={data.reportsBy} empty="This rider hasn't reported anyone." />
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setReason('');
+        }}
+        title={`Suspend ${data.displayName ?? 'this rider'}?`}
+        description="They are signed out, removed from any room, their ride ends, and they can't use the app until you reinstate them."
+        confirmLabel="Suspend rider"
+        onConfirm={async () => {
+          if (await suspendRider(data.uid, reason.trim() || null)) await reload();
+        }}
+      >
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (internal, optional)" maxLength={500} />
+      </ConfirmDialog>
     </div>
   );
 }

@@ -3,17 +3,19 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Copy, Phone, Search, UserRound } from 'lucide-react';
+import { Ban, Copy, Phone, RotateCcw, Search, UserRound } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { formatDate } from '@/lib/api';
-import { copyText } from '@/lib/rider-actions';
+import { copyText, reinstateRider, suspendRider } from '@/lib/rider-actions';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import {
+  ConfirmDialog,
   ErrorAlert,
   initials,
   PageHeader,
@@ -45,6 +47,8 @@ export default function RidersPage() {
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [suspending, setSuspending] = useState<Rider | null>(null);
+  const [reason, setReason] = useState('');
   const { data, error, loading, reload } = useAdminQuery<Rider[]>(`/users${applied ? `?search=${encodeURIComponent(applied)}` : ''}`, 30_000);
 
   const rows = useMemo(
@@ -161,6 +165,16 @@ export default function RidersPage() {
                               <Phone className="mr-2 h-4 w-4" /> Copy phone
                             </DropdownMenuItem>
                           ) : null}
+                          <DropdownMenuSeparator />
+                          {r.suspended ? (
+                            <DropdownMenuItem onClick={async () => { if (await reinstateRider(r.uid)) await reload(); }}>
+                              <RotateCcw className="mr-2 h-4 w-4" /> Reinstate
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setSuspending(r)}>
+                              <Ban className="mr-2 h-4 w-4" /> Suspend
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -171,6 +185,24 @@ export default function RidersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={suspending != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSuspending(null);
+            setReason('');
+          }
+        }}
+        title={`Suspend ${suspending?.displayName ?? 'this rider'}?`}
+        description="They are signed out, removed from any room, their ride ends, and they can't use the app until you reinstate them."
+        confirmLabel="Suspend rider"
+        onConfirm={async () => {
+          if (suspending && (await suspendRider(suspending.uid, reason.trim() || null))) await reload();
+        }}
+      >
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (internal, optional)" maxLength={500} />
+      </ConfirmDialog>
     </div>
   );
 }

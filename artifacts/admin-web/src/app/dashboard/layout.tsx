@@ -6,10 +6,13 @@ import { usePathname } from 'next/navigation';
 import {
   ChevronRight,
   ChevronsUpDown,
+  Flag,
   Gauge,
   LayoutDashboard,
   Loader2,
   LogOut,
+  Radio,
+  ShieldAlert,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -45,6 +48,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 const MENU = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Riders', href: '/dashboard/riders', icon: Users },
+  { name: 'Reports', href: '/dashboard/reports', icon: Flag },
+  { name: 'Live Rooms', href: '/dashboard/rooms', icon: Radio },
+  { name: 'Safety Alerts', href: '/dashboard/safety', icon: ShieldAlert },
   { name: 'Trip Validation', href: '/dashboard/settings', icon: Gauge },
 ];
 
