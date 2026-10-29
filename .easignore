@@ -15,6 +15,23 @@ android/
 ios/
 **/ios/
 
+# Web / tool caches (admin-web's Next.js cache alone is ~430 MB)
+.next/
+**/.next/
+.turbo/
+**/.turbo/
+.cache/
+**/.cache/
+coverage/
+**/coverage/
+**/test-results/
+*.tsbuildinfo
+**/.cxx/
+**/.gradle/
+**/.metro-health-check*
+.sleek-cache/
+**/.sleek-cache/
+
 # Environment & Local Files
 # EXPO_PUBLIC_* values for builds come from eas.json / EAS environment variables, not local .env files.
 .env
