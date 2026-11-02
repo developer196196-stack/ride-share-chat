@@ -2,6 +2,8 @@
 export const images = {
   logoMark: require('@/assets/images/logo-mark.png'),
   logoFull: require('@/assets/images/logo-full.png'),
+  logoWide: require('@/assets/images/logo-wide.png'),
+  smartAiMatch: require('@/assets/images/smartaimatch.png'),
   onboardingRooms: require('@/assets/images/onboarding-rooms.jpeg'),
   onboardingTransit: require('@/assets/images/onboarding-transit.jpeg'),
 } as const;

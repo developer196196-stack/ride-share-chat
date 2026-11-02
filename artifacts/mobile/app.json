@@ -70,8 +70,8 @@
         {
           "image": "./assets/images/logo-full.png",
           "resizeMode": "contain",
-          "imageWidth": 220,
-          "backgroundColor": "#F8FAFC"
+          "imageWidth": 200,
+          "backgroundColor": "#FFFFFF"
         }
       ],
       "@livekit/react-native-expo-plugin",
