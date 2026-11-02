@@ -7,13 +7,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getAuthMe } from '@workspace/api-client-react';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, withAlpha } from '@/constants/colors';
-import { radius, shadow } from '@/constants/layout';
+import { colors } from '@/constants/colors';
 import { images } from '@/constants/images';
 import { routes } from '@/constants/routes';
 import { fonts, textSize, tracking } from '@/constants/typography';
-import { GlowBlob, LiveDot, Pulse, Screen } from '@/components/ui';
+import { Screen } from '@/components/ui';
 import { getOnboardingFlags, routeForSignedInRider } from '@/lib/onboarding';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -60,156 +58,62 @@ export default function SplashScreen() {
   }, [delayDone, isAuthReady, go]);
 
   return (
-    <Screen
-      spaceBetween
-      contentStyle={styles.content}
-      background={
-        <>
-          <GlowBlob color={colors.primary} opacity={0.15} size={384} style={styles.glowTopRight} />
-          <GlowBlob color={colors.slate400} opacity={0.1} size={384} style={styles.glowBottomLeft} />
-        </>
-      }
-    >
-      <View style={styles.topRow}>
-        <View style={styles.livePill}>
-          <LiveDot />
-          <Text style={styles.livePillText}>Global Network Live</Text>
-        </View>
-      </View>
+    <Screen spaceBetween contentStyle={styles.content} background={<View style={styles.white} />}>
+      <View />
 
       <Pressable style={styles.center} onPress={() => isAuthReady && void go()}>
-        <View style={styles.logoWrap}>
-          <GlowBlob color={colors.primary} opacity={0.2} size={380} style={styles.logoGlow} />
-          <Image source={images.logoFull} style={styles.logo} contentFit="contain" />
-        </View>
+        <Image source={images.logoFull} style={styles.logo} contentFit="contain" />
+        <Text style={styles.tagline}>Connect on Every Journey™</Text>
       </Pressable>
 
-      <View style={styles.bottom}>
-        <View style={styles.progressGroup}>
-          <View style={styles.progressTrack}>
-            <Pulse style={styles.progressFillWrap}>
-              <LinearGradient
-                colors={[colors.primary, withAlpha(colors.primary, 0.8)]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.progressFill}
-              />
-            </Pulse>
-          </View>
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressLabel}>Initializing Trip Validation…</Text>
-            <Text style={styles.progressReady}>Ready</Text>
-          </View>
-        </View>
-        <Text style={styles.tagline}>Ride-Only Live Video Matchmaking</Text>
+      <View style={styles.poweredBy}>
+        <Text style={styles.poweredLabel}>Powered by</Text>
+        <Image source={images.smartAiMatch} style={styles.poweredLogo} contentFit="contain" />
       </View>
     </Screen>
   );
 }
 
+/** Client splash design (assets/brand/SCR-ONB-01-V3): white, logo, tagline, "Powered by SmartAIMatch". */
 const styles = StyleSheet.create({
+  white: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#FFFFFF',
+  },
   content: {
     paddingHorizontal: 24,
     paddingVertical: 40,
     alignItems: 'center',
   },
-  glowTopRight: {
-    top: -128,
-    right: -128,
-  },
-  glowBottomLeft: {
-    bottom: -128,
-    left: -128,
-  },
-  topRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.xs,
-  },
-  livePillText: {
-    ...textSize.xs,
-    fontFamily: fonts.sans.semibold,
-    color: colors.foreground,
-    letterSpacing: tracking.wide(12),
-  },
   center: {
     width: '100%',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    marginVertical: 24,
-  },
-  logoWrap: {
-    width: '100%',
-    maxWidth: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoGlow: {
-    alignSelf: 'center',
+    gap: 28,
   },
   logo: {
-    width: '100%',
+    width: '72%',
+    maxWidth: 280,
     aspectRatio: 1,
-    maxHeight: 288,
-  },
-  bottom: {
-    width: '100%',
-    maxWidth: 320,
-    gap: 16,
-  },
-  progressGroup: {
-    gap: 8,
-  },
-  progressTrack: {
-    height: 6,
-    width: '100%',
-    backgroundColor: colors.muted,
-    borderRadius: radius.full,
-    overflow: 'hidden',
-    padding: 2,
-  },
-  progressFillWrap: {
-    height: '100%',
-    width: '66.666%',
-  },
-  progressFill: {
-    flex: 1,
-    borderRadius: radius.full,
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressLabel: {
-    ...textSize['11'],
-    fontFamily: fonts.mono.medium,
-    color: colors.mutedForeground,
-  },
-  progressReady: {
-    ...textSize['11'],
-    fontFamily: fonts.mono.bold,
-    color: colors.accent,
   },
   tagline: {
-    ...textSize['11'],
-    fontFamily: fonts.sans.semibold,
+    ...textSize.xl,
+    fontFamily: fonts.sans.bold,
+    color: colors.foreground,
+    textAlign: 'center',
+  },
+  poweredBy: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  poweredLabel: {
+    ...textSize.xs,
+    fontFamily: fonts.sans.bold,
     color: colors.mutedForeground,
     textTransform: 'uppercase',
-    letterSpacing: tracking.widest(11),
-    textAlign: 'center',
+    letterSpacing: tracking.widest(12),
+  },
+  poweredLogo: {
+    width: 180,
+    aspectRatio: 434 / 123,
   },
 });
