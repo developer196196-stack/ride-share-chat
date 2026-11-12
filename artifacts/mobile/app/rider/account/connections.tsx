@@ -6,7 +6,7 @@ import { getListRidesQueryKey, useListRides, type RideSummary } from '@workspace
 import { colors, withAlpha } from '@/constants/colors';
 import { radius, shadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, ErrorBanner, Icon, IconButton, Screen } from '@/components/ui';
 import { BottomTabBar } from '@/components/rideshare';
@@ -28,6 +28,7 @@ function formatWhen(iso: string): string {
 }
 
 export default function ConnectionsScreen() {
+  const catalog = useRoomCatalog();
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const rides = useListRides({ query: { queryKey: getListRidesQueryKey(), enabled: isAuthenticated } });
@@ -100,7 +101,7 @@ export default function ConnectionsScreen() {
                     <Icon name="solarCarBold" size={16} color={colors.accent} />
                   </View>
                   <View style={styles.requestText}>
-                    <Text style={styles.requestName}>{ride.vibe ? `${vibeOption(ride.vibe).label} ride` : 'Validated ride'}</Text>
+                    <Text style={styles.requestName}>{ride.vibe ? `${catalog.option(ride.vibe).label} ride` : 'Validated ride'}</Text>
                     <Text style={styles.requestMeta}>
                       {formatWhen(ride.startedAt)} · {ride.distanceMiles} miles
                     </Text>

@@ -21,6 +21,8 @@ type Props<T extends string> = {
   selected?: T | null;
   onSelect: (value: T) => void;
   onClose: () => void;
+  /** Keep the sheet open after a pick (multi-step pickers swap the options instead). */
+  closeOnSelect?: boolean;
 };
 
 /** Bottom sheet list picker (country code, ride style). */
@@ -31,6 +33,7 @@ export function OptionSheet<T extends string>({
   selected,
   onSelect,
   onClose,
+  closeOnSelect = true,
 }: Props<T>) {
   const insets = useSafeAreaInsets();
 
@@ -50,7 +53,7 @@ export function OptionSheet<T extends string>({
               <Pressable
                 onPress={() => {
                   onSelect(item.value);
-                  onClose();
+                  if (closeOnSelect) onClose();
                 }}
                 style={({ pressed }) => [
                   styles.row,

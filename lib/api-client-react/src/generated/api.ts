@@ -46,6 +46,7 @@ import type {
   ReportResult,
   RideSummary,
   RiderProfile,
+  RoomCategories,
   RoomSession,
   RoomSettingsUpdate,
   SafetyAlertRequest,
@@ -690,6 +691,84 @@ export const useResetValidation = <TError = ErrorType<UnauthorizedResponse | Ser
       > => {
       return useMutation(getResetValidationMutationOptions(options));
     }
+
+export const getGetRoomCategoriesUrl = () => {
+
+
+
+
+  return `/api/v1/rooms/categories`
+}
+
+/**
+ * Every group and room type, including hidden ones (`active = false`) so older rooms and rides keep their labels. Pickers show only active types in active groups.
+ * @summary R.O.O.M. groups and room types (managed from the admin panel)
+ */
+export const getRoomCategories = async ( options?: RequestInit): Promise<RoomCategories> => {
+
+  return customFetch<RoomCategories>(getGetRoomCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRoomCategoriesQueryKey = () => {
+    return [
+    `/api/v1/rooms/categories`
+    ] as const;
+    }
+
+
+export const getGetRoomCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof getRoomCategories>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoomCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRoomCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoomCategories>>> = ({ signal }) => getRoomCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRoomCategories>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRoomCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof getRoomCategories>>>
+export type GetRoomCategoriesQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary R.O.O.M. groups and room types (managed from the admin panel)
+ */
+
+export function useGetRoomCategories<TData = Awaited<ReturnType<typeof getRoomCategories>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoomCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRoomCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListVibesUrl = () => {
 

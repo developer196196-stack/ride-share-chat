@@ -23,10 +23,10 @@ import { getRoomSkipBlockSec, MPS_TO_MPH } from '../validation/validation.config
 import { ValidationService } from '../validation/validation.service';
 import type { TerminationReason } from '../validation/validation.types';
 import { LiveKitService } from './livekit.service';
+import { RoomCategoriesService } from './room-categories.service';
 import {
   DISCOVER_LIMIT,
   ROOM_CAPACITY,
-  VIBES,
   type DiscoverRoomDto,
   type LiveRoomDto,
   type RoomHostDto,
@@ -123,6 +123,7 @@ export class RoomsService implements OnModuleInit {
     private readonly livekit: LiveKitService,
     private readonly profiles: ProfilesService,
     private readonly realtime: RealtimeService,
+    private readonly categories: RoomCategoriesService,
   ) {}
 
   onModuleInit(): void {
@@ -161,7 +162,7 @@ export class RoomsService implements OnModuleInit {
 
   async vibeStats(): Promise<{ vibe: Vibe; rooms: number; riders: number; openSeats: number }[]> {
     return Promise.all(
-      VIBES.map(async (vibe) => {
+      this.categories.allIds().map(async (vibe) => {
         const roomIds = await this.redis.smembers(keys.all(vibe));
         const counts = await Promise.all(roomIds.map((id) => this.redis.scard(keys.members(id))));
         const riders = counts.reduce((a, b) => a + b, 0);
@@ -182,7 +183,7 @@ export class RoomsService implements OnModuleInit {
   async discover(uid: string): Promise<{ rooms: DiscoverRoomDto[]; liveRooms: number }> {
     const current = await this.currentRoomId(uid);
     const perVibe = await Promise.all(
-      VIBES.map(async (vibe) => (await this.redis.smembers(keys.all(vibe))).map((roomId) => ({ roomId, vibe }))),
+      this.categories.allIds().map(async (vibe) => (await this.redis.smembers(keys.all(vibe))).map((roomId) => ({ roomId, vibe }))),
     );
     const all = perVibe.flat();
     const rooms = await Promise.all(
@@ -271,7 +272,7 @@ export class RoomsService implements OnModuleInit {
     const self = members.find((m) => m.isSelf);
     return {
       roomId,
-      vibe: vibe as Vibe,
+      vibe: this.categories.resolve(vibe) ?? this.categories.defaultId(),
       capacity: ROOM_CAPACITY,
       hostUid: hostUid ?? null,
       matching: matching === 'manual' ? 'manual' : 'auto',
@@ -294,6 +295,7 @@ export class RoomsService implements OnModuleInit {
 
   /** Host a Room: open a new public room for the mood with the rider as moderator. */
   async host(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
+    this.categories.requireActive(vibe);
     await this.requireVerified(uid);
     await this.leaveRoom(uid);
     const roomId = await this.withVibeLock(vibe, async () => {
@@ -313,7 +315,7 @@ export class RoomsService implements OnModuleInit {
   async joinById(uid: string, roomId: string): Promise<RoomSessionDto> {
     if (!ROOM_ID.test(roomId)) notFound();
     await this.requireVerified(uid);
-    const vibe = (await this.redis.hget(keys.room(roomId), 'vibe')) as Vibe | null;
+    const vibe = this.categories.resolve(await this.redis.hget(keys.room(roomId), 'vibe'));
     if (!vibe) notFound();
     if ((await this.currentRoomId(uid)) === roomId) {
       const session = await this.buildSession(uid, roomId);
@@ -349,10 +351,11 @@ export class RoomsService implements OnModuleInit {
   }
 
   async join(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
+    this.categories.requireActive(vibe);
     await this.requireVerified(uid);
     const current = await this.currentRoomId(uid);
     if (current) {
-      const currentVibe = await this.redis.hget(keys.room(current), 'vibe');
+      const currentVibe = this.categories.resolve(await this.redis.hget(keys.room(current), 'vibe'));
       if (currentVibe === vibe) {
         const session = await this.buildSession(uid, current);
         if (session) return session;
@@ -370,7 +373,7 @@ export class RoomsService implements OnModuleInit {
     }
     const roomId = await this.currentRoomId(uid);
     if (!roomId) conflict('NOT_IN_ROOM', 'You are not in a R.O.O.M.');
-    const vibe = ((await this.redis.hget(keys.room(roomId), 'vibe')) ?? 'party_mode') as Vibe;
+    const vibe = this.categories.resolve(await this.redis.hget(keys.room(roomId), 'vibe')) ?? this.categories.defaultId();
     const others = (await this.roomMembers(roomId)).filter((m) => m !== uid);
     const blockSec = getRoomSkipBlockSec();
     if (others.length > 0 && blockSec > 0) {
@@ -471,14 +474,16 @@ export class RoomsService implements OnModuleInit {
 
   private async getRideSession(uid: string): Promise<RideSession | null> {
     const raw = await this.redis.get(keys.session(uid));
-    return raw ? (JSON.parse(raw) as RideSession) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw) as RideSession;
+    return { ...session, vibe: this.categories.resolve(session.vibe) ?? this.categories.defaultId() };
   }
 
   /** Leaves the current room (if any) without ending the ride. */
   async leaveRoom(uid: string): Promise<string | null> {
     const roomId = await this.currentRoomId(uid);
     if (!roomId) return null;
-    const vibe = (await this.redis.hget(keys.room(roomId), 'vibe')) as Vibe | null;
+    const vibe = this.categories.resolve(await this.redis.hget(keys.room(roomId), 'vibe'));
 
     await this.redis
       .multi()
@@ -574,8 +579,9 @@ export class RoomsService implements OnModuleInit {
     uid: string,
     update: { vibe?: Vibe; matching?: RoomMatching; locked?: boolean },
   ): Promise<RoomSessionDto> {
+    if (update.vibe) this.categories.requireActive(update.vibe);
     const { roomId, meta, members } = await this.requireHost(uid);
-    const oldVibe = meta.vibe as Vibe;
+    const oldVibe = this.categories.resolve(meta.vibe) ?? this.categories.defaultId();
     const vibe = update.vibe ?? oldVibe;
 
     if (vibe !== oldVibe) {
@@ -617,7 +623,7 @@ export class RoomsService implements OnModuleInit {
       members: { uid: string; displayName: string; photoUrl: string | null; isHost: boolean }[];
     }[]
   > {
-    const ids = (await Promise.all(VIBES.map((vibe) => this.redis.smembers(keys.all(vibe))))).flat();
+    const ids = (await Promise.all(this.categories.allIds().map((vibe) => this.redis.smembers(keys.all(vibe))))).flat();
     const rooms = await Promise.all(
       ids.map(async (roomId) => {
         const [meta, members] = await Promise.all([
@@ -632,7 +638,7 @@ export class RoomsService implements OnModuleInit {
     return live
       .map(({ roomId, meta, members }) => ({
         roomId,
-        vibe: meta.vibe as Vibe,
+        vibe: this.categories.resolve(meta.vibe) ?? this.categories.defaultId(),
         hostUid: meta.hostUid ?? null,
         matching: (meta.matching === 'manual' ? 'manual' : 'auto') as RoomMatching,
         locked: meta.locked === '1',
@@ -680,7 +686,7 @@ export class RoomsService implements OnModuleInit {
         if (!meta.vibe || count === 0) return;
         result.set(uid, {
           roomId,
-          vibe: meta.vibe as Vibe,
+          vibe: this.categories.resolve(meta.vibe) ?? this.categories.defaultId(),
           isHost: meta.hostUid === uid,
           memberCount: count,
           capacity: ROOM_CAPACITY,
@@ -718,7 +724,7 @@ export class RoomsService implements OnModuleInit {
       .exec();
     this.realtime.emitToUser(target, ServerEvents.ROOM_INVITE, {
       roomId,
-      vibe: meta.vibe,
+      vibe: this.categories.resolve(meta.vibe) ?? this.categories.defaultId(),
       from: await this.hostCard(uid),
       viaRequest: opts.viaRequest === true,
       expiresAt: new Date(Date.now() + INVITE_TTL_SEC * 1000).toISOString(),
@@ -892,7 +898,7 @@ export class RoomsService implements OnModuleInit {
         peersMet: r.peersMet,
         graceCount: r.graceCount,
         graceSeconds: r.graceSeconds,
-        vibe: (r.vibe as Vibe | null) ?? null,
+        vibe: this.categories.resolve(r.vibe),
         endReason: r.endReason,
       };
     });

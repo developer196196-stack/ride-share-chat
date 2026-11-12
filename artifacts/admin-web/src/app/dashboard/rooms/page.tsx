@@ -68,7 +68,7 @@ export default function RoomsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-6">Room</TableHead>
-                <TableHead>Mood</TableHead>
+                <TableHead>Room type</TableHead>
                 <TableHead>Riders</TableHead>
                 <TableHead>Host</TableHead>
                 <TableHead>Access</TableHead>
