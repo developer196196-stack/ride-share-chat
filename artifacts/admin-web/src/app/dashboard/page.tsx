@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, Car, Flag, Gauge, Radio, ShieldAlert, UserX, Users } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/use-admin-query';
-import { VIBE_LABELS } from '@/lib/api';
+import { VIBE_GROUPS, VIBE_LABELS } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -80,19 +80,34 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Rooms by mood</CardTitle>
-            <CardDescription>Live rooms and riders for each vibe</CardDescription>
+            <CardTitle>Rooms by category</CardTitle>
+            <CardDescription>Live rooms and riders for each room type, by group</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(data?.byVibe ?? []).map((row) => (
-              <div key={row.vibe} className="rounded-lg border p-3 space-y-1">
-                <p className="text-sm font-semibold">{VIBE_LABELS[row.vibe] ?? row.vibe}</p>
-                <p className="text-xs text-muted-foreground">
-                  {row.rooms} room{row.rooms === 1 ? '' : 's'} · {row.riders} rider{row.riders === 1 ? '' : 's'}
-                </p>
-              </div>
-            ))}
-            {!data ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-16" />) : null}
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {data
+              ? VIBE_GROUPS.map((group) => {
+                  const rows = group.vibes.map((vibe) => data.byVibe.find((r) => r.vibe === vibe) ?? { vibe, rooms: 0, riders: 0 });
+                  const riders = rows.reduce((a, r) => a + r.riders, 0);
+                  return (
+                    <div key={group.label} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold">{group.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {riders} rider{riders === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                      {rows.map((row) => (
+                        <div key={row.vibe} className="flex items-baseline justify-between gap-2 text-xs">
+                          <span>{VIBE_LABELS[row.vibe] ?? row.vibe}</span>
+                          <span className="text-muted-foreground">
+                            {row.rooms} room{row.rooms === 1 ? '' : 's'} · {row.riders} rider{row.riders === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })
+              : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-24" />)}
           </CardContent>
         </Card>
 

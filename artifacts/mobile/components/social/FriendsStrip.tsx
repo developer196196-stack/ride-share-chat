@@ -11,7 +11,7 @@ import {
 import { colors, withAlpha } from '@/constants/colors';
 import { radius } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize } from '@/constants/typography';
 import { getApiErrorMessage } from '@/lib/api/error-message';
 import { useTripStore } from '@/stores/trip.store';
@@ -22,6 +22,7 @@ import { Avatar } from './UserRow';
  * friend who hosts a private room for a seat.
  */
 export function FriendsStrip({ enabled, canJoin }: { enabled: boolean; canJoin: boolean }) {
+  const catalog = useRoomCatalog();
   const router = useRouter();
   const following = useListFollowing({ query: { queryKey: getListFollowingQueryKey(), enabled, refetchInterval: 10_000 } });
   const currentRoomId = useTripStore((s) => s.room?.roomId);
@@ -62,7 +63,7 @@ export function FriendsStrip({ enabled, canJoin }: { enabled: boolean; canJoin: 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {riding.map((friend) => {
           const live = friend.live!;
-          const mood = vibeOption(live.vibe);
+          const mood = catalog.option(live.vibe);
           // A private room can only be asked through its host.
           const canAsk = !live.open && live.isHost;
           let label = 'Private';

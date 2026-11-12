@@ -4,6 +4,8 @@ import type { DecodedIdToken } from '@workspace/firebase';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { parseBody } from '../common/zod-parse';
 import { AdminGuard } from './admin.guard';
+import { RoomCategoriesService } from '../rooms/room-categories.service';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '../rooms/room-categories';
 import { AdminService } from './admin.service';
 
 type AdminRequest = { user?: DecodedIdToken };
@@ -19,7 +21,22 @@ const SettingsBody = z.object({ values: z.record(z.string(), z.union([z.number()
 @Controller('v1/admin')
 @UseGuards(FirebaseAuthGuard, AdminGuard)
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly categories: RoomCategoriesService,
+  ) {}
+
+  /** Room categories plus the icon and colour choices the app supports. */
+  @Get('settings/room-categories')
+  roomCategories() {
+    return { ...this.categories.catalog(), icons: CATEGORY_ICONS, colors: CATEGORY_COLORS };
+  }
+
+  @Put('settings/room-categories')
+  async updateRoomCategories(@Req() req: AdminRequest, @Body() body: unknown) {
+    await this.categories.save(body, req.user!.email ?? null);
+    return this.roomCategories();
+  }
 
   @Get('me')
   me(@Req() req: AdminRequest) {

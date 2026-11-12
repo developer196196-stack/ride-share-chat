@@ -1,6 +1,5 @@
-/** Keep in sync with OpenAPI `Vibe`, `RoomSession`, `RideSummary`. */
-export const VIBES = ['party_mode', 'networking', 'deep_talks', 'just_chilling'] as const;
-export type Vibe = (typeof VIBES)[number];
+/** R.O.O.M. type id from the room category catalog (see room-categories.ts). */
+export type Vibe = string;
 
 /** 6 seats including the host (client request: host + 5 riders). */
 export const ROOM_CAPACITY = 6;

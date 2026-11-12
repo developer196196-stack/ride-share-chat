@@ -5,6 +5,7 @@ import { parseBody, validationError } from '../common/zod-parse';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { ChatService } from '../chat/chat.service';
 import { RoomsService } from './rooms.service';
+import { RoomCategoriesService } from './room-categories.service';
 
 type AuthedRequest = { user?: DecodedIdToken };
 
@@ -14,7 +15,19 @@ export class RoomsController {
   constructor(
     private readonly rooms: RoomsService,
     private readonly chat: ChatService,
+    private readonly categories: RoomCategoriesService,
   ) {}
+
+  /** Builds released before the room categories still send the old moods; map them to the new types. */
+  private withCurrentVibe(body: unknown): unknown {
+    if (!body || typeof body !== 'object' || !('vibe' in body) || typeof body.vibe !== 'string') return body;
+    return { ...body, vibe: this.categories.resolve(body.vibe) };
+  }
+
+  @Get('rooms/categories')
+  categoriesCatalog() {
+    return this.categories.catalog();
+  }
 
   @Get('rooms/vibes')
   vibes() {
@@ -29,7 +42,7 @@ export class RoomsController {
   @Post('rooms/host')
   @HttpCode(200)
   host(@Req() req: AuthedRequest, @Body() body: unknown) {
-    return this.rooms.host(req.user!.uid, parseBody(HostRoomBody, body).vibe);
+    return this.rooms.host(req.user!.uid, parseBody(HostRoomBody, this.withCurrentVibe(body)).vibe);
   }
 
   @Post('rooms/:roomId/join')
@@ -46,7 +59,7 @@ export class RoomsController {
   @Post('rooms/join')
   @HttpCode(200)
   join(@Req() req: AuthedRequest, @Body() body: unknown) {
-    return this.rooms.join(req.user!.uid, parseBody(JoinRoomBody, body).vibe);
+    return this.rooms.join(req.user!.uid, parseBody(JoinRoomBody, this.withCurrentVibe(body)).vibe);
   }
 
   @Post('rooms/next')
@@ -63,7 +76,7 @@ export class RoomsController {
 
   @Patch('rooms/current/settings')
   updateSettings(@Req() req: AuthedRequest, @Body() body: unknown) {
-    const update = parseBody(UpdateRoomSettingsBody, body);
+    const update = parseBody(UpdateRoomSettingsBody, this.withCurrentVibe(body));
     if (update.vibe == null && update.matching == null && update.locked == null) {
       validationError('Send at least one of vibe, matching or locked.');
     }

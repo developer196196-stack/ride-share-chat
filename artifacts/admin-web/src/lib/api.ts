@@ -53,7 +53,28 @@ export function formatDuration(sec: number | null | undefined): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+/** R.O.O.M. categories: 4 groups × 3 room types (matches the API `Vibe` enum). */
+export const VIBE_GROUPS: { label: string; vibes: string[] }[] = [
+  { label: 'Corporate & Commuter', vibes: ['business_networking', 'morning_grind', 'after_work_unwind'] },
+  { label: 'University & College', vibes: ['study_break', 'campus_connect', 'pre_game'] },
+  { label: 'Long-Haul Travelers', vibes: ['travel_stories', 'deep_conversations', 'pop_culture'] },
+  { label: 'General Transit', vibes: ['traffic_venting', 'local_recs', 'singles_meetup'] },
+];
+
 export const VIBE_LABELS: Record<string, string> = {
+  business_networking: 'Business Networking',
+  morning_grind: 'Morning Grind',
+  after_work_unwind: 'After-Work Unwind',
+  study_break: 'Study Break',
+  campus_connect: 'Campus Connect',
+  pre_game: 'The Pre-Game',
+  travel_stories: 'Travel Stories',
+  deep_conversations: 'Deep Conversations',
+  pop_culture: 'Pop Culture',
+  traffic_venting: 'Traffic Venting',
+  local_recs: 'Local Recs',
+  singles_meetup: 'Singles Meetup',
+  // Moods used before the room categories (older rides).
   party_mode: 'Party Mode',
   networking: 'Networking',
   deep_talks: 'Deep Talks',

@@ -257,7 +257,7 @@ export default function RiderDetailPage() {
                 <TableHead>Distance</TableHead>
                 <TableHead>Riders met</TableHead>
                 <TableHead>Grace stops</TableHead>
-                <TableHead>Mood</TableHead>
+                <TableHead>Room type</TableHead>
                 <TableHead className="pr-6">End reason</TableHead>
               </TableRow>
             </TableHeader>

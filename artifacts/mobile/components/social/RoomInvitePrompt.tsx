@@ -6,7 +6,7 @@ import { joinRoomById } from '@workspace/api-client-react';
 import { colors, withAlpha } from '@/constants/colors';
 import { MAX_CONTENT_WIDTH, radius, shadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize } from '@/constants/typography';
 import { getApiErrorMessage } from '@/lib/api/error-message';
 import { useTripStore } from '@/stores/trip.store';
@@ -18,6 +18,7 @@ export function RoomInvitePrompt() {
   const insets = useSafeAreaInsets();
   const invite = useTripStore((s) => s.invite);
   const [joining, setJoining] = useState(false);
+  const catalog = useRoomCatalog();
 
   // Invites expire on the server after 10 minutes.
   useEffect(() => {
@@ -28,7 +29,7 @@ export function RoomInvitePrompt() {
   }, [invite]);
 
   if (!invite) return null;
-  const mood = vibeOption(invite.vibe);
+  const mood = catalog.option(invite.vibe);
   const first = invite.from.displayName.split(/\s+/)[0];
 
   const join = async () => {

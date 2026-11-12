@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import type { LiveRoom } from '@workspace/api-client-react';
 import { colors, withAlpha } from '@/constants/colors';
 import { radius } from '@/constants/layout';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog, type RoomCatalog } from '@/constants/vibes';
 import { fonts, textSize } from '@/constants/typography';
 import { LiveDot } from '@/components/ui';
 
@@ -26,9 +26,9 @@ export function Avatar({ name, photoUrl, size = 40, ring }: { name: string; phot
   );
 }
 
-/** "Riding now · #PartyMode (host)" for a friend's live room. */
-export function liveLabel(live: LiveRoom): string {
-  const mood = `#${vibeOption(live.vibe).label.replace(/\s+/g, '')}`;
+/** "Riding now · #LocalRecs (host)" for a friend's live room. */
+export function liveLabel(live: LiveRoom, catalog: RoomCatalog): string {
+  const mood = `#${catalog.option(live.vibe).label.replace(/\s+/g, '')}`;
   return `Riding now · ${mood}${live.isHost ? ' · hosting' : ''}`;
 }
 
@@ -42,7 +42,8 @@ type Props = {
 
 /** Avatar, name, caption (or friend's live room) and a trailing action. */
 export function UserRow({ name, photoUrl, caption, live, right }: Props) {
-  const ring = live ? vibeOption(live.vibe).color : undefined;
+  const catalog = useRoomCatalog();
+  const ring = live ? catalog.option(live.vibe).color : undefined;
   return (
     <View style={styles.row}>
       <Avatar name={name} photoUrl={photoUrl} ring={ring} />
@@ -54,7 +55,7 @@ export function UserRow({ name, photoUrl, caption, live, right }: Props) {
           <View style={styles.liveRow}>
             <LiveDot size={6} color={colors.accent} />
             <Text style={[styles.caption, { color: colors.accent }]} numberOfLines={1}>
-              {liveLabel(live)}
+              {liveLabel(live, catalog)}
             </Text>
           </View>
         ) : (

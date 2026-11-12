@@ -23,7 +23,7 @@ import {
 import { colors, withAlpha } from '@/constants/colors';
 import { radius, shadow, tintedShadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { VIBE_OPTIONS, vibeOption } from '@/constants/vibes';
+import { useRoomCatalog, type RoomCatalog } from '@/constants/vibes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { ErrorBanner, Icon, LiveDot, OptionSheet, Screen, type Option } from '@/components/ui';
 import { BottomTabBar, LogoTile } from '@/components/rideshare';
@@ -40,16 +40,26 @@ const GAP = 8;
 const DOCK_CLEARANCE = 132;
 const TAB_BAR_HEIGHT = 72;
 
-/** "Party Mode" → "#PartyMode". */
-const moodTag = (vibe: Vibe) => `#${vibeOption(vibe).label.replace(/\s+/g, '')}`;
+/** "Local Recs" → "#LocalRecs". */
+const moodTag = (label: string) => `#${label.replace(/\s+/g, '')}`;
 const firstName = (name: string) => name.split(/\s+/)[0] ?? name;
 
-const HOST_OPTIONS: Option<Vibe>[] = VIBE_OPTIONS.map((v) => ({
-  value: v.value,
-  label: v.headline,
-  leading: <Icon name={v.icon} size={18} color={v.color} />,
-  trailing: moodTag(v.value),
-}));
+/** Host a Room, step 1: the group. */
+const groupOptions = (catalog: RoomCatalog): Option<string>[] =>
+  catalog.groups.map((g) => ({
+    value: g.id,
+    label: g.label,
+    leading: <Icon name={g.icon} size={18} color={g.color} />,
+  }));
+
+/** Host a Room, step 2: one of the group's room types. */
+const roomOptions = (catalog: RoomCatalog, group: string): Option<Vibe>[] =>
+  catalog.vibesInGroup(group).map((v) => ({
+    value: v.value,
+    label: v.headline,
+    leading: <Icon name={v.icon} size={18} color={v.color} />,
+    trailing: moodTag(v.label),
+  }));
 
 function RoomCard({
   room,
@@ -64,7 +74,7 @@ function RoomCard({
   disabled: boolean;
   onPress: () => void;
 }) {
-  const mood = vibeOption(room.vibe);
+  const mood = useRoomCatalog().option(room.vibe);
   const host = room.host;
   const seatsLeft = room.capacity - room.memberCount;
   return (
@@ -87,7 +97,7 @@ function RoomCard({
       />
       <View style={[styles.moodTag, { backgroundColor: withAlpha(mood.color, 0.9) }]}>
         <Text style={styles.moodTagText} numberOfLines={1}>
-          {moodTag(room.vibe)}
+          {moodTag(mood.label)}
         </Text>
       </View>
       <View style={styles.cardCenter}>
@@ -139,6 +149,7 @@ function OpenSlot({ size, onPress, disabled }: { size: { w: number; h: number };
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  const catalog = useRoomCatalog();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -163,6 +174,11 @@ export default function DiscoverScreen() {
   const joinRoom = useJoinRoomById();
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [hostOpen, setHostOpen] = useState(false);
+  const [hostGroup, setHostGroup] = useState<string | null>(null);
+  const closeHost = () => {
+    setHostOpen(false);
+    setHostGroup(null);
+  };
   const [error, setError] = useState<string | null>(null);
   const [gridWidth, setGridWidth] = useState(0);
 
@@ -193,7 +209,7 @@ export default function DiscoverScreen() {
   };
 
   const host = async (vibe: Vibe) => {
-    setHostOpen(false);
+    closeHost();
     setError(null);
     try {
       enter(await hostRoom.mutateAsync({ data: { vibe } }));
@@ -235,7 +251,7 @@ export default function DiscoverScreen() {
         {currentRoom ? (
           <Pressable style={styles.returnBanner} onPress={() => router.push(routes.activeRoom)}>
             <LiveDot size={8} />
-            <Text style={styles.returnText}>You're in {vibeOption(currentRoom.vibe).label} · Return to your R.O.O.M.</Text>
+            <Text style={styles.returnText}>You're in {catalog.option(currentRoom.vibe).label} · Return to your R.O.O.M.</Text>
             <Icon name="solarAltArrowRightLinear" size={16} color={colors.accent} />
           </Pressable>
         ) : null}
@@ -310,13 +326,24 @@ export default function DiscoverScreen() {
       </View>
 
       <SafetyFab style={{ bottom: TAB_BAR_HEIGHT + DOCK_CLEARANCE + insets.bottom + 4 }} />
-      <OptionSheet
-        visible={hostOpen}
-        title="Pick your room's mood"
-        options={HOST_OPTIONS}
-        onSelect={(vibe) => void host(vibe)}
-        onClose={() => setHostOpen(false)}
-      />
+      {hostGroup ? (
+        <OptionSheet
+          visible={hostOpen}
+          title={`${catalog.group(hostGroup).label}: pick your room`}
+          options={roomOptions(catalog, hostGroup)}
+          onSelect={(vibe) => void host(vibe)}
+          onClose={closeHost}
+        />
+      ) : (
+        <OptionSheet
+          visible={hostOpen}
+          title="Who is your room for?"
+          options={groupOptions(catalog)}
+          closeOnSelect={false}
+          onSelect={setHostGroup}
+          onClose={closeHost}
+        />
+      )}
     </View>
   );
 }

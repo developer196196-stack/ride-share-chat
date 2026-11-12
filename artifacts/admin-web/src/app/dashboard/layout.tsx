@@ -8,6 +8,7 @@ import {
   ChevronsUpDown,
   Flag,
   Gauge,
+  Shapes,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -51,6 +52,7 @@ const MENU = [
   { name: 'Reports', href: '/dashboard/reports', icon: Flag },
   { name: 'Live Rooms', href: '/dashboard/rooms', icon: Radio },
   { name: 'Safety Alerts', href: '/dashboard/safety', icon: ShieldAlert },
+  { name: 'Room Categories', href: '/dashboard/categories', icon: Shapes },
   { name: 'Trip Validation', href: '/dashboard/settings', icon: Gauge },
 ];
 
