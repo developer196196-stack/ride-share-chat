@@ -42,17 +42,18 @@ const VARIANTS: Record<Variant, { container: ViewStyle; text: string }> = {
     container: { backgroundColor: colors.primary, ...tintedShadow(colors.primary, 0.25) },
     text: colors.primaryForeground,
   },
+  // Secondary and ghost buttons use Trust Blue (client brand brief).
   secondary: {
     container: {
-      backgroundColor: colors.secondary,
+      backgroundColor: withAlpha(colors.trust, 0.08),
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: withAlpha(colors.trust, 0.2),
     },
     text: colors.secondaryForeground,
   },
   outline: {
-    container: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-    text: colors.foreground,
+    container: { backgroundColor: colors.card, borderWidth: 1, borderColor: withAlpha(colors.trust, 0.3) },
+    text: colors.trust,
   },
   destructive: {
     container: { backgroundColor: colors.destructive, ...tintedShadow(colors.destructive, 0.2, 'md') },

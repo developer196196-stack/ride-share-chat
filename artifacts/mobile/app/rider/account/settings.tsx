@@ -120,7 +120,6 @@ export default function SettingsScreen() {
           </Pressable>
         </Card>
 
-        {/* Hidden for now; uncomment to restore.
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           <Card style={styles.group}>
@@ -143,7 +142,6 @@ export default function SettingsScreen() {
             />
           </Card>
         </View>
-        */}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy & Transit Shields</Text>
@@ -171,7 +169,6 @@ export default function SettingsScreen() {
               title="Skipped riders are blocked for 60 minutes"
               caption="Anyone you leave with Next won't be matched with you again for an hour"
             />
-            {/* Hidden for now; uncomment to restore.
             <Divider />
             <SettingsRow
               icon="solarUsersGroupRoundedBold"
@@ -179,7 +176,6 @@ export default function SettingsScreen() {
               caption="Follow riders; friends can see when you're riding"
               onPress={() => router.push(routes.network)}
             />
-            */}
             <Divider />
             <SettingsRow
               icon="solarHistoryLinear"

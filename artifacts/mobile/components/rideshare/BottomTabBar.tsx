@@ -28,7 +28,7 @@ export function BottomTabBar({ active }: { active: Tab }) {
       <View style={styles.row}>
         {TABS.map((tab) => {
           const isActive = tab.key === active;
-          const color = isActive ? colors.primary : colors.mutedForeground;
+          const color = isActive ? colors.trust : colors.mutedForeground;
           return (
             <Pressable
               key={tab.key}

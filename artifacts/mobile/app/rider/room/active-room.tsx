@@ -272,7 +272,7 @@ export default function ActiveRoomScreen() {
                 <Text style={styles.nextRoomText}>Next Room</Text>
               </Pressable>
             )}
-            {/* Hidden for now; uncomment to restore. <SafetyFab inline /> */}
+            <SafetyFab inline />
           </View>
         </View>
 

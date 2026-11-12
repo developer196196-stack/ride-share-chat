@@ -93,7 +93,7 @@ export default function PermissionsScreen() {
           eyebrowIcon="solarShieldWarningBold"
           eyebrowTone="accent"
           title="Device permissions"
-          description="Required to calculate real-time speed, anti-couch spoofing, and 9-seater video rooms."
+          description="Required to calculate real-time speed, anti-couch spoofing, and 6-seat video rooms."
         />
 
         <View style={styles.list}>

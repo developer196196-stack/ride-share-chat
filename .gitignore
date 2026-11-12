@@ -61,3 +61,5 @@ sleek-temp-ref/
 /scripts/use-node.ps1
 
 .nvmrc
+
+docs/
