@@ -15,7 +15,7 @@ import { markIntroSeen } from '@/lib/onboarding';
 import { LogoTile } from '@/components/rideshare';
 
 const FEATURES: { icon: IconName; tint: string; title: string; caption: string }[] = [
-  { icon: 'solarUsersGroupRoundedBold', tint: colors.primary, title: '9-Seat', caption: 'Rolling Rooms' },
+  { icon: 'solarUsersGroupRoundedBold', tint: colors.primary, title: '6-Seat', caption: 'Rolling Rooms' },
   { icon: 'solarHourglassLineBold', tint: colors.accent, title: '5 Min', caption: 'Traffic Grace' },
   { icon: 'solarForwardBold', tint: colors.primary, title: 'Instant', caption: 'Fast Escape' },
 ];
@@ -34,7 +34,7 @@ export default function OnboardingHowItWorks() {
           <LogoTile size={40} />
           <View>
             <Text style={styles.brandName}>Rideshare Chats</Text>
-            <Text style={styles.brandTag}>Global Community</Text>
+            <Text style={styles.brandTag}>Connect on Every Journey™</Text>
           </View>
         </View>
         <Pressable style={styles.skip} onPress={next}>
@@ -55,7 +55,7 @@ export default function OnboardingHowItWorks() {
             >
               <View style={styles.mediaCaption}>
                 <LiveDot />
-                <Text style={styles.mediaCaptionText}>Live from Uber & Lyft rides nationwide</Text>
+                <Text style={styles.mediaCaptionText}>Live from rideshares, trains, buses & shuttles</Text>
               </View>
             </LinearGradient>
           </View>
@@ -71,8 +71,8 @@ export default function OnboardingHowItWorks() {
           </View>
           <Text style={styles.title}>Verified rides only. Real people moving together.</Text>
           <Text style={styles.description}>
-            Our Trip Validation Engine checks speed ({'>'}15 MPH), micro-vibrations, and ride receipts so
-            every room member is genuinely moving.
+            Our Trip Validation Engine checks speed, micro-vibrations and in-vehicle motion so every
+            room member is genuinely moving.
           </Text>
 
           <Divider style={styles.divider} />
@@ -106,21 +106,7 @@ export default function OnboardingHowItWorks() {
       </View>
 
       <View style={styles.footer}>
-        <View style={styles.dots}>
-          <View style={styles.dotActive} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
         <View style={styles.actions}>
-          <Button
-            label="How It Works"
-            variant="secondary"
-            height={48}
-            borderRadius={radius.xl}
-            size="xs"
-            weight="semibold"
-            style={styles.actionSecondary}
-          />
           <Button
             label="Verify & Enter Ride"
             icon="solarArrowRightBold"
@@ -329,34 +315,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 14,
   },
-  dots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  dotActive: {
-    width: 24,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: withAlpha(colors.mutedForeground, 0.3),
-  },
   actions: {
     flexDirection: 'row',
     gap: 10,
   },
-  actionSecondary: {
-    flex: 1,
-    width: undefined,
-  },
   actionPrimary: {
-    flex: 2,
+    flex: 1,
     width: undefined,
   },
   legal: {

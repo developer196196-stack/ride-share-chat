@@ -198,7 +198,7 @@ export default function VibeSelectionScreen() {
           />
         )}
       </Screen>
-      {/* Hidden for now; uncomment to restore. <SafetyFab style={styles.fab} /> */}
+      <SafetyFab style={styles.fab} />
     </View>
   );
 }

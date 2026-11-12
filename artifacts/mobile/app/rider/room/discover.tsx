@@ -309,7 +309,7 @@ export default function DiscoverScreen() {
         </BlurView>
       </View>
 
-      {/* Hidden for now; uncomment to restore. <SafetyFab style={{ bottom: TAB_BAR_HEIGHT + DOCK_CLEARANCE + insets.bottom + 4 }} /> */}
+      <SafetyFab style={{ bottom: TAB_BAR_HEIGHT + DOCK_CLEARANCE + insets.bottom + 4 }} />
       <OptionSheet
         visible={hostOpen}
         title="Pick your room's mood"

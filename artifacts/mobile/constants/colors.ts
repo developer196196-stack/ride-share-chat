@@ -1,29 +1,39 @@
 /**
- * Semantic color tokens — mirrors the Sleek `:root` block in sleek-temp-ref/globals.css.
- * Crimson primary + emerald accent on a cool slate background.
+ * Semantic color tokens — client brand brief (Oct 2026): pure white surfaces, Racing Red primary,
+ * Trust Blue for navigation and secondary actions, Emerald for verified/success, Amber for warnings,
+ * Midnight Navy text. Light only; no dark mode.
  */
 export const colors = {
-  background: '#F8FAFC',
-  foreground: '#0B0F19',
-  primary: '#C91A25',
+  background: '#FFFFFF',
+  foreground: '#0F172A',
+  /** Racing Red: primary buttons, brand elements, urgent actions. */
+  primary: '#E32424',
   primaryForeground: '#FFFFFF',
-  secondary: '#F1F5F9',
-  secondaryForeground: '#0F172A',
-  muted: '#E2E8F0',
-  mutedForeground: '#64748B',
+  /** Faint Trust Blue tint for secondary surfaces (chips, tiles) instead of slate grey. */
+  secondary: '#F4F6FF',
+  /** Secondary / ghost button text. */
+  secondaryForeground: '#4A69FF',
+  muted: '#EEF1F6',
+  mutedForeground: '#475569',
+  /** Emerald: verified and security badges, online states, success. */
   accent: '#10B981',
   accentForeground: '#FFFFFF',
-  destructive: '#C91A25',
+  destructive: '#E32424',
   destructiveForeground: '#FFFFFF',
   card: '#FFFFFF',
-  cardForeground: '#0B0F19',
-  border: '#E2E8F0',
-  input: '#F1F5F9',
-  ring: '#C91A25',
-  chart1: '#C91A25',
+  cardForeground: '#0F172A',
+  border: '#EDF0F5',
+  input: '#F5F7FB',
+  ring: '#E32424',
+  /** Trust Blue: navigation, headers, reliability indicators, secondary buttons. */
+  trust: '#4A69FF',
+  trustForeground: '#FFFFFF',
+  /** Amber: ratings, match scores, warnings. */
+  warning: '#F59E0B',
+  chart1: '#E32424',
   chart2: '#475569',
-  chart3: '#D97706',
-  chart4: '#2563EB',
+  chart3: '#F59E0B',
+  chart4: '#4A69FF',
   chart5: '#10B981',
 
   // Fixed palette values used by specific Sleek screens

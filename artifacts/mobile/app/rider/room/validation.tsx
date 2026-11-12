@@ -382,7 +382,7 @@ export default function TripValidationScreen() {
         />
         <Text style={styles.footnote}>Telemetry runs exclusively while actively commuting.</Text>
       </Screen>
-      {/* Hidden for now; uncomment to restore. <SafetyFab style={styles.fab} /> */}
+      <SafetyFab style={styles.fab} />
       <SafetySheet visible={shareOpen} onClose={() => setShareOpen(false)} />
     </View>
   );

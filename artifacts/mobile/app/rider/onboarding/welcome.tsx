@@ -36,11 +36,11 @@ export default function OnboardingWelcome() {
           >
             <View style={styles.roomsBadge}>
               <Icon name="solarUsersGroupRoundedBold" size={13} color={colors.primaryForeground} />
-              <Text style={styles.roomsBadgeText}>9-Seat Rolling Rooms</Text>
+              <Text style={styles.roomsBadgeText}>6-Seat Rolling Rooms</Text>
             </View>
             <Text style={styles.heroTitle}>Meet While You Move</Text>
             <Text style={styles.heroBody}>
-              Live video chats with verified Uber & Lyft passengers actively in transit.
+              Live video chats with verified passengers on rideshares, trains, buses & shuttles.
             </Text>
           </LinearGradient>
         </View>

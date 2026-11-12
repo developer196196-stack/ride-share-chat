@@ -1,60 +1,63 @@
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 import { colors } from './colors';
 
-/** Sleek `--radius: 0.75rem` scale (rounded-lg = radius, xl = +4, 2xl = +8, 3xl = +16). */
+/**
+ * Corner radii. Client brief: ultra-rounded buttons, cards and sheets (1.5rem–3rem), so xl and up
+ * are 24–40; xs–lg stay small for icons, chips and inner elements.
+ */
 export const radius = {
   xs: 4,
   sm: 8,
   md: 10,
   lg: 12,
-  xl: 16,
-  '2xl': 20,
-  '3xl': 28,
+  xl: 24,
+  '2xl': 28,
+  '3xl': 36,
   full: 9999,
 } as const;
 
-/** Tailwind shadow scale, tuned for React Native. */
+/** Soft elevation, client brief: rgba(0,0,0,0.08), e.g. 0 8px 24px. Larger sizes only spread further. */
 export const shadow = {
   xs: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 1,
   },
   sm: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 2,
   },
   md: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
     elevation: 4,
   },
   lg: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 32,
     elevation: 8,
   },
   xl: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.12,
-    shadowRadius: 25,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.08,
+    shadowRadius: 40,
     elevation: 12,
   },
   '2xl': {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 25 },
-    shadowOpacity: 0.25,
-    shadowRadius: 50,
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.08,
+    shadowRadius: 48,
     elevation: 16,
   },
 } satisfies Record<string, ViewStyle>;
