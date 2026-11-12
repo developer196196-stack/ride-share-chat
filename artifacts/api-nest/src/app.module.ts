@@ -5,6 +5,7 @@ import { HttpLoggingMiddleware } from './common/http-logging.middleware';
 import { DocsModule } from './docs/docs.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { GatewayModule } from './realtime/gateway.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -29,6 +30,7 @@ import { loadAppConfig } from './config/configuration';
     AuthModule,
     ValidationModule,
     PreferencesModule,
+    NotificationsModule,
     RoomsModule,
     SafetyModule,
     SocialModule,

@@ -18,6 +18,8 @@ const envSchema = z.object({
   LIVEKIT_API_SECRET: optionalString,
   /** Accept `simulated: true` telemetry (dev builds / emulators). Never enable in production. */
   VALIDATION_ALLOW_SIMULATED: optionalString,
+  /** Optional: Expo access token, needed only if "Enhanced security for push notifications" is on in Expo. */
+  EXPO_ACCESS_TOKEN: optionalString,
 });
 
 export type AppConfig = z.infer<typeof envSchema> & {

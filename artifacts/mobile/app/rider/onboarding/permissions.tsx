@@ -35,7 +35,17 @@ const PERMISSIONS: { key: PermissionKey; icon: IconName; tint: string; title: st
     title: 'Motion & Activity',
     caption: 'Micro-vibrations and in-vehicle detection',
   },
+  {
+    key: 'notifications',
+    icon: 'mdiBell',
+    tint: colors.accent,
+    title: 'Notifications',
+    caption: 'Room invites, join requests and new followers',
+  },
 ];
+
+/** Needed for Trip Validation; notifications are optional. */
+const VALIDATION_KEYS: PermissionKey[] = ['media', 'location', 'motion'];
 
 export default function PermissionsScreen() {
   const router = useRouter();
@@ -81,7 +91,7 @@ export default function PermissionsScreen() {
     }
   };
 
-  const allGranted = status ? Object.values(status).every(Boolean) : false;
+  const allGranted = status ? VALIDATION_KEYS.every((key) => status[key]) : false;
 
   return (
     <Screen spaceBetween contentStyle={styles.content}>

@@ -1,6 +1,7 @@
 /** Friends & Followers: who you follow, who follows you, and which friends are riding now. */
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import {
   getListFollowersQueryKey,
   getListFollowingQueryKey,
@@ -28,7 +29,9 @@ function caption(u: SocialUser): string {
 export default function NetworkScreen() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isAuthReady = useAuthStore((s) => s.isAuthReady);
-  const [tab, setTab] = useState<Tab>('following');
+  // A "new follower" notification opens the Followers tab.
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(params.tab === 'followers' ? 'followers' : 'following');
   const following = useListFollowing({ query: { queryKey: getListFollowingQueryKey(), enabled: isAuthenticated, refetchInterval: 15_000 } });
   const followers = useListFollowers({ query: { queryKey: getListFollowersQueryKey(), enabled: isAuthenticated } });
   const active = tab === 'following' ? following : followers;

@@ -7,6 +7,8 @@ export const FirestoreCollections = {
   admins: 'admins',
   /** `appConfig/{name}` — settings changed from the admin panel (e.g. `validation`). */
   appConfig: 'appConfig',
+  /** `pushTokens/{sha256(token)}` — one doc per device, owned by the rider signed in on it. */
+  pushTokens: 'pushTokens',
 } as const;
 
 /** Subcollections of `users/{uid}`. */

@@ -552,6 +552,38 @@ export interface Preferences {
   subtitleStyle: PreferencesSubtitleStyle;
   /** Offer a one-tap "Share my trip" when the rider becomes VERIFIED */
   promptShareOnVerified: boolean;
+  /** Push notification when someone follows you (always returned; optional on save) */
+  notifyNewFollowers?: boolean;
+  /** Push notification for room invites, accepted requests and join requests to your room */
+  notifyRoomInvites?: boolean;
+  /** Push notification when a friend opens a R.O.O.M. */
+  notifyFriendsLive?: boolean;
+}
+
+export type PushTokenInputPlatform = typeof PushTokenInputPlatform[keyof typeof PushTokenInputPlatform];
+
+
+export const PushTokenInputPlatform = {
+  ios: 'ios',
+  android: 'android',
+} as const;
+
+export interface PushTokenInput {
+  /**
+     * Expo push token, e.g. ExponentPushToken[xxxx]
+     * @minLength 1
+     * @maxLength 256
+     */
+  token: string;
+  platform: PushTokenInputPlatform;
+}
+
+export interface RemovePushTokenInput {
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  token: string;
 }
 
 export type ContactChannel = typeof ContactChannel[keyof typeof ContactChannel];

@@ -101,6 +101,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#E32424"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Rideshare Chats uses the camera for live video in R.O.O.M.s.",

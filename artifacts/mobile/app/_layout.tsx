@@ -30,6 +30,8 @@ import { createQueryClient } from '@/lib/query/query-client';
 import { ApiProvider } from '@/providers/ApiProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { RealtimeProvider } from '@/providers/RealtimeProvider';
+import { pushAvailable } from '@/lib/notifications/push';
+import { PushNotificationsHost } from '@/providers/PushNotificationsHost';
 import { TripSessionHost } from '@/providers/TripSessionHost';
 import { SharePrompt } from '@/components/safety/SharePrompt';
 import { NoticeToast } from '@/components/room/NoticeToast';
@@ -85,6 +87,7 @@ export default function RootLayout() {
                 <Stack.Screen name="rider/account" />
               </Stack>
               <TripSessionHost />
+              {pushAvailable ? <PushNotificationsHost /> : null}
               <SharePrompt />
               <RoomInvitePrompt />
               <NoticeToast />

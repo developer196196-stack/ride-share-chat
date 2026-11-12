@@ -37,6 +37,9 @@ export const DEFAULT_PREFERENCES: UserPreferencesDoc = {
   subtitleSize: 'md',
   subtitleStyle: 'bubble',
   promptShareOnVerified: false,
+  notifyNewFollowers: true,
+  notifyRoomInvites: true,
+  notifyFriendsLive: true,
 };
 
 const cacheKey = (uid: string) => `prefs:${uid}`;
@@ -58,7 +61,7 @@ export class PreferencesService {
 
   async get(uid: string, languageHint?: string | null): Promise<UserPreferencesDoc> {
     const cached = await this.redis?.get(cacheKey(uid));
-    if (cached) return JSON.parse(cached) as UserPreferencesDoc;
+    if (cached) return { ...DEFAULT_PREFERENCES, ...(JSON.parse(cached) as UserPreferencesDoc) };
 
     const snap = await this.users().doc(uid).get();
     const stored = (snap.data() as UserDoc | undefined)?.preferences;
@@ -72,7 +75,9 @@ export class PreferencesService {
   }
 
   async update(uid: string, prefs: UserPreferencesDoc): Promise<UserPreferencesDoc> {
-    const next = { ...prefs, nativeLanguage: normalizeLanguage(prefs.nativeLanguage) };
+    // Older app builds send no notification settings: keep the saved ones.
+    const current = await this.get(uid);
+    const next = { ...current, ...prefs, nativeLanguage: normalizeLanguage(prefs.nativeLanguage) };
     // set+merge: works before auth bootstrap created the user document.
     await this.users().doc(uid).set({ preferences: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     await this.redis?.set(cacheKey(uid), JSON.stringify(next), 'EX', CACHE_TTL_SEC);

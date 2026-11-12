@@ -23,4 +23,10 @@ export interface Preferences {
   subtitleStyle: PreferencesSubtitleStyle;
   /** Offer a one-tap "Share my trip" when the rider becomes VERIFIED */
   promptShareOnVerified: boolean;
+  /** Push notification when someone follows you (always returned; optional on save) */
+  notifyNewFollowers?: boolean;
+  /** Push notification for room invites, accepted requests and join requests to your room */
+  notifyRoomInvites?: boolean;
+  /** Push notification when a friend opens a R.O.O.M. */
+  notifyFriendsLive?: boolean;
 }

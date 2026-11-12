@@ -887,7 +887,10 @@ export const GetPreferencesResponse = zod.object({
   "autoTranslate": zod.boolean(),
   "subtitleSize": zod.enum(['sm', 'md', 'lg']),
   "subtitleStyle": zod.enum(['bubble', 'subtitle']),
-  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED')
+  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED'),
+  "notifyNewFollowers": zod.boolean().optional().describe('Push notification when someone follows you (always returned; optional on save)'),
+  "notifyRoomInvites": zod.boolean().optional().describe('Push notification for room invites, accepted requests and join requests to your room'),
+  "notifyFriendsLive": zod.boolean().optional().describe('Push notification when a friend opens a R.O.O.M.')
 })
 
 
@@ -904,7 +907,10 @@ export const UpdatePreferencesBody = zod.object({
   "autoTranslate": zod.boolean(),
   "subtitleSize": zod.enum(['sm', 'md', 'lg']),
   "subtitleStyle": zod.enum(['bubble', 'subtitle']),
-  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED')
+  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED'),
+  "notifyNewFollowers": zod.boolean().optional().describe('Push notification when someone follows you (always returned; optional on save)'),
+  "notifyRoomInvites": zod.boolean().optional().describe('Push notification for room invites, accepted requests and join requests to your room'),
+  "notifyFriendsLive": zod.boolean().optional().describe('Push notification when a friend opens a R.O.O.M.')
 })
 
 export const updatePreferencesResponseNativeLanguageMin = 2;
@@ -917,7 +923,10 @@ export const UpdatePreferencesResponse = zod.object({
   "autoTranslate": zod.boolean(),
   "subtitleSize": zod.enum(['sm', 'md', 'lg']),
   "subtitleStyle": zod.enum(['bubble', 'subtitle']),
-  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED')
+  "promptShareOnVerified": zod.boolean().describe('Offer a one-tap \"Share my trip\" when the rider becomes VERIFIED'),
+  "notifyNewFollowers": zod.boolean().optional().describe('Push notification when someone follows you (always returned; optional on save)'),
+  "notifyRoomInvites": zod.boolean().optional().describe('Push notification for room invites, accepted requests and join requests to your room'),
+  "notifyFriendsLive": zod.boolean().optional().describe('Push notification when a friend opens a R.O.O.M.')
 })
 
 
@@ -970,6 +979,35 @@ export const DeleteTrustedContactParams = zod.object({
 })
 
 export const DeleteTrustedContactResponse = zod.void()
+
+
+/**
+ * @summary Register this device for push notifications (Expo push token)
+ */
+export const registerPushTokenBodyTokenMax = 256;
+
+
+
+export const RegisterPushTokenBody = zod.object({
+  "token": zod.string().min(1).max(registerPushTokenBodyTokenMax).describe('Expo push token, e.g. ExponentPushToken[xxxx]'),
+  "platform": zod.enum(['ios', 'android'])
+})
+
+export const RegisterPushTokenResponse = zod.void()
+
+
+/**
+ * @summary Stop push notifications to this device (sign-out)
+ */
+export const removePushTokenBodyTokenMax = 256;
+
+
+
+export const RemovePushTokenBody = zod.object({
+  "token": zod.string().min(1).max(removePushTokenBodyTokenMax)
+})
+
+export const RemovePushTokenResponse = zod.void()
 
 
 /**

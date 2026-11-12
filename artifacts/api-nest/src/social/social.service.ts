@@ -5,6 +5,7 @@ import { FirestoreCollections, FOLLOWERS_SUBCOLLECTION, FOLLOWING_SUBCOLLECTION 
 import type { ErrorResponseBody } from '../common/error-response';
 import { requireFirestore } from '../common/require-firestore';
 import { FIRESTORE } from '../firebase/firebase.tokens';
+import { PushService } from '../notifications/push.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { RoomsService } from '../rooms/rooms.service';
 import type { LiveRoomDto } from '../rooms/rooms.types';
@@ -41,6 +42,7 @@ export class SocialService {
     @Inject(FIRESTORE) private readonly firestore: Firestore | null,
     private readonly profiles: ProfilesService,
     private readonly rooms: RoomsService,
+    private readonly push: PushService,
   ) {}
 
   private get db(): Firestore {
@@ -65,14 +67,34 @@ export class SocialService {
       const body: ErrorResponseBody = { code: 'CANNOT_FOLLOW_SELF', message: 'You cannot follow yourself.' };
       throw new ConflictException(body);
     }
-    if (!(await this.exists(target))) userNotFound();
+    const [targetExists, already, followsBack] = await Promise.all([
+      this.exists(target),
+      this.edge(uid, FOLLOWING_SUBCOLLECTION, target).get(),
+      this.edge(target, FOLLOWING_SUBCOLLECTION, uid).get(),
+    ]);
+    if (!targetExists) userNotFound();
     const doc = { createdAt: Timestamp.now() };
     await this.db
       .batch()
       .set(this.edge(uid, FOLLOWING_SUBCOLLECTION, target), doc)
       .set(this.edge(target, FOLLOWERS_SUBCOLLECTION, uid), doc)
       .commit();
+    if (!already.exists) void this.notifyFollow(uid, target, followsBack.exists);
     return { following: true, followerCount: await this.countOf(target, FOLLOWERS_SUBCOLLECTION) };
+  }
+
+  private async notifyFollow(uid: string, target: string, nowFriends: boolean): Promise<void> {
+    const name = (await this.profiles.getMany([uid])).get(uid)?.displayName ?? 'A rider';
+    await this.push.sendToUser(target, {
+      kind: 'new_follower',
+      title: nowFriends ? 'You’re now friends' : 'New follower',
+      body: nowFriends
+        ? `${name} followed you back. You’ll see when each other is riding.`
+        : `${name} started following you. Follow back to become friends.`,
+      data: { uid },
+      // Unfollow + follow again doesn't notify twice in a day.
+      dedupe: { key: `follow:${uid}`, sec: 24 * 60 * 60 },
+    });
   }
 
   async unfollow(uid: string, target: string): Promise<{ following: boolean; followerCount: number }> {
