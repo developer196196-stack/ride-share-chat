@@ -9,12 +9,8 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export type Vibe = typeof Vibe[keyof typeof Vibe];
-
-
-export const Vibe = {
-  party_mode: 'party_mode',
-  networking: 'networking',
-  deep_talks: 'deep_talks',
-  just_chilling: 'just_chilling',
-} as const;
+/**
+ * R.O.O.M. type id from the room category catalog (`GET /v1/rooms/categories`).
+ * @pattern ^[a-z][a-z0-9_]{1,39}$
+ */
+export type Vibe = string;

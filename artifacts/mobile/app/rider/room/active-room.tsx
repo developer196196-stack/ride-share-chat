@@ -25,7 +25,7 @@ import { colors, withAlpha } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
 import { radius, shadow, tintedShadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { VIBE_OPTIONS, vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize } from '@/constants/typography';
 import { ErrorBanner, Icon, LiveDot, Screen } from '@/components/ui';
 import { ChatOverlay } from '@/components/room/ChatOverlay';
@@ -82,6 +82,7 @@ export default function ActiveRoomScreen() {
   const [reportOpen, setReportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [moodsOpen, setMoodsOpen] = useState(false);
+  const catalog = useRoomCatalog();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [requestsOpen, setRequestsOpen] = useState(false);
   const newRequests = useTripStore((s) => s.newRequests);
@@ -212,7 +213,7 @@ export default function ActiveRoomScreen() {
     );
   }
 
-  const vibe = vibeOption(room.vibe);
+  const vibe = catalog.option(room.vibe);
   const inGrace = snapshot?.state === 'GRACE';
   const postRide = snapshot?.state === 'POST_RIDE';
   const isHost = room.hostUid != null && room.hostUid === uid;
@@ -278,7 +279,8 @@ export default function ActiveRoomScreen() {
 
         {isHost && moodsOpen ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moods} contentContainerStyle={styles.moodsContent}>
-            {VIBE_OPTIONS.map((option) => {
+            {/* Mood shift stays within the room's group, so the room keeps its audience. */}
+            {catalog.vibesInGroup(vibe.group).map((option) => {
               const active = option.value === room.vibe;
               return (
                 <Pressable

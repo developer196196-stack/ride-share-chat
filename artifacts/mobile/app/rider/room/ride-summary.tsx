@@ -6,7 +6,7 @@ import { leaveRoom, type RideSummary } from '@workspace/api-client-react';
 import { colors } from '@/constants/colors';
 import { radius } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, ErrorBanner, Icon, Screen } from '@/components/ui';
 import { LogoTile, StatRow } from '@/components/rideshare';
@@ -33,6 +33,7 @@ function formatDuration(totalSec: number): string {
 }
 
 export default function RideSummaryScreen() {
+  const catalog = useRoomCatalog();
   const router = useRouter();
   const stored = useTripStore((s) => s.summary);
   const termination = useTripStore((s) => s.termination);
@@ -100,7 +101,7 @@ export default function RideSummaryScreen() {
             value={summary ? (END_REASONS[summary.endReason] ?? summary.endReason) : '—'}
             valueStyle={{ color: summary?.endReason === 'user_ended' || summary?.endReason === 'exited_vehicle' ? colors.accent : colors.chart3 }}
           />
-          <StatRow label="Vibe category" value={summary?.vibe ? vibeOption(summary.vibe).label : '—'} valueStyle={{ color: colors.primary }} />
+          <StatRow label="Room type" value={summary?.vibe ? catalog.option(summary.vibe).label : '—'} valueStyle={{ color: colors.primary }} />
         </View>
       </Card>
 

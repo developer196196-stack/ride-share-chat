@@ -8,7 +8,7 @@ import type { DisconnectReason, Participant } from 'livekit-client';
 import { colors, withAlpha } from '@/constants/colors';
 import { radius } from '@/constants/layout';
 import { fonts, textSize } from '@/constants/typography';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { Icon, Pulse } from '@/components/ui';
 import type { IconName } from '@/constants/icons';
 import { getLiveKit } from '@/lib/livekit';
@@ -77,6 +77,7 @@ const END_NOTICE: Record<VideoEndReason, string> = {
 
 /** Live video grid for a R.O.O.M.; falls back to avatar tiles where WebRTC isn't available. */
 export function VideoRoom({ session, renderControls, onVideoError, onVideoEnded, moderation, renderFocusActions }: Props) {
+  const catalog = useRoomCatalog();
   const lk = getLiveKit();
   const token = session.livekit?.token;
   // Once the server has removed this device, its video pass is revoked: stop instead of retrying.
@@ -114,7 +115,7 @@ export function VideoRoom({ session, renderControls, onVideoError, onVideoEnded,
   const grid: GridOptions = {
     capacity: session.capacity,
     // Speaking borders use the room's mood colour.
-    accent: vibeOption(session.vibe).color,
+    accent: catalog.option(session.vibe).color,
     // Manual matching or Privacy Lock: empty seats are closed to new riders.
     closed: session.locked || session.matching === 'manual',
     moderation,

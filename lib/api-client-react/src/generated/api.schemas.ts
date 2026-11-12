@@ -295,15 +295,40 @@ export interface ValidationSnapshot {
   updatedAt: string;
 }
 
-export type Vibe = typeof Vibe[keyof typeof Vibe];
+/**
+ * R.O.O.M. type id from the room category catalog (`GET /v1/rooms/categories`).
+ * @pattern ^[a-z][a-z0-9_]{1,39}$
+ */
+export type Vibe = string;
 
+export interface RoomCategoryGroup {
+  id: string;
+  label: string;
+  /** Who the group is for, e.g. "Campus buses and local transit" */
+  description: string;
+  /** Icon key from the app's built-in icon set */
+  icon: string;
+  /** Hex colour shared by the group's room types */
+  color: string;
+  active: boolean;
+}
 
-export const Vibe = {
-  party_mode: 'party_mode',
-  networking: 'networking',
-  deep_talks: 'deep_talks',
-  just_chilling: 'just_chilling',
-} as const;
+export interface RoomCategoryType {
+  id: Vibe;
+  groupId: string;
+  label: string;
+  headline: string;
+  description: string;
+  tag: string;
+  icon: string;
+  active: boolean;
+}
+
+export interface RoomCategories {
+  groups: RoomCategoryGroup[];
+  types: RoomCategoryType[];
+  updatedAt: string | null;
+}
 
 export interface VibeStats {
   vibe: Vibe;

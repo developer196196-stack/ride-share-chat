@@ -30,6 +30,7 @@ import { REDIS } from '../redis/redis.module';
 import { ServerEvents } from '../realtime/realtime.events';
 import { RealtimeService } from '../realtime/realtime.service';
 import { RoomsService } from '../rooms/rooms.service';
+import { RoomCategoriesService } from '../rooms/room-categories.service';
 import { getValidationOverrides, relaxedValidationOverrides, setValidationOverrides } from '../validation/validation.config';
 import { ValidationService } from '../validation/validation.service';
 import { VALIDATION_SETTING_KEYS, VALIDATION_SETTINGS, validateSetting } from './validation-settings';
@@ -61,6 +62,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     private readonly rooms: RoomsService,
     private readonly validation: ValidationService,
     private readonly realtime: RealtimeService,
+    private readonly categories: RoomCategoriesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -250,7 +252,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           distanceMiles: r.distanceMiles,
           peersMet: r.peersMet,
           graceCount: r.graceCount,
-          vibe: r.vibe,
+          vibe: this.categories.resolve(r.vibe),
           endReason: r.endReason,
         };
       }),

@@ -223,6 +223,25 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/rooms/categories:
+    get:
+      operationId: getRoomCategories
+      tags: [rooms]
+      summary: R.O.O.M. groups and room types (managed from the admin panel)
+      description: >
+        Every group and room type, including hidden ones (`active = false`) so older rooms and rides
+        keep their labels. Pickers show only active types in active groups.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The room category catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomCategories"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/rooms/vibes:
     get:
       operationId: listVibes
@@ -1525,7 +1544,63 @@ components:
       required: [state, score, speedMph, modules, checks, graceDeadline, graceRemainingSec, postRideDeadline, postRideRemainingSec, terminationReason, thresholds, updatedAt]
     Vibe:
       type: string
-      enum: [party_mode, networking, deep_talks, just_chilling]
+      description: R.O.O.M. type id from the room category catalog (`GET /v1/rooms/categories`).
+      pattern: "^[a-z][a-z0-9_]{1,39}$"
+    RoomCategoryGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+          description: Who the group is for, e.g. "Campus buses and local transit"
+        icon:
+          type: string
+          description: Icon key from the app's built-in icon set
+        color:
+          type: string
+          description: Hex colour shared by the group's room types
+        active:
+          type: boolean
+      required: [id, label, description, icon, color, active]
+    RoomCategoryType:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Vibe"
+        groupId:
+          type: string
+        label:
+          type: string
+        headline:
+          type: string
+        description:
+          type: string
+        tag:
+          type: string
+        icon:
+          type: string
+        active:
+          type: boolean
+      required: [id, groupId, label, headline, description, tag, icon, active]
+    RoomCategories:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomCategoryGroup"
+        types:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomCategoryType"
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [groups, types, updatedAt]
     VibeStats:
       type: object
       properties:

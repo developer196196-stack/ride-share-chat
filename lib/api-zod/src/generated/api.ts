@@ -296,10 +296,43 @@ export const ResetValidationResponse = zod.object({
 
 
 /**
+ * Every group and room type, including hidden ones (`active = false`) so older rooms and rides keep their labels. Pickers show only active types in active groups.
+ * @summary R.O.O.M. groups and room types (managed from the admin panel)
+ */
+export const getRoomCategoriesResponseTypesItemIdRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
+export const GetRoomCategoriesResponse = zod.object({
+  "groups": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "description": zod.string().describe('Who the group is for, e.g. \"Campus buses and local transit\"'),
+  "icon": zod.string().describe('Icon key from the app\'s built-in icon set'),
+  "color": zod.string().describe('Hex colour shared by the group\'s room types'),
+  "active": zod.boolean()
+})),
+  "types": zod.array(zod.object({
+  "id": zod.string().regex(getRoomCategoriesResponseTypesItemIdRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
+  "groupId": zod.string(),
+  "label": zod.string(),
+  "headline": zod.string(),
+  "description": zod.string(),
+  "tag": zod.string(),
+  "icon": zod.string(),
+  "active": zod.boolean()
+})),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
  * @summary Live R.O.O.M. counts per vibe
  */
+export const listVibesResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const ListVibesResponseItem = zod.object({
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(listVibesResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "rooms": zod.number(),
   "riders": zod.number(),
   "openSeats": zod.number()
@@ -310,10 +343,13 @@ export const ListVibesResponse = zod.array(ListVibesResponseItem)
 /**
  * @summary The rider's current R.O.O.M. (if any)
  */
+export const getCurrentRoomResponseRoomOneVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const GetCurrentRoomResponse = zod.object({
   "room": zod.union([zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(getCurrentRoomResponseRoomOneVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -341,13 +377,19 @@ export const GetCurrentRoomResponse = zod.object({
  * Returns the LiveKit connection details.
  * @summary Join a R.O.O.M. for a vibe
  */
+export const joinRoomBodyVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const JoinRoomBody = zod.object({
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling'])
+  "vibe": zod.string().regex(joinRoomBodyVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).')
 })
+
+export const joinRoomResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
 
 export const JoinRoomResponse = zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(joinRoomResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -374,6 +416,7 @@ export const JoinRoomResponse = zod.object({
  * Listing works before verification; joining needs VERIFIED.
  * @summary Discovery Grid — up to 9 live R.O.O.M.s with open seats
  */
+export const listDiscoverRoomsResponseRoomsItemVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
 export const listDiscoverRoomsResponseRoomsMax = 9;
 
 
@@ -381,7 +424,7 @@ export const listDiscoverRoomsResponseRoomsMax = 9;
 export const ListDiscoverRoomsResponse = zod.object({
   "rooms": zod.array(zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(listDiscoverRoomsResponseRoomsItemVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "memberCount": zod.number(),
   "capacity": zod.number(),
   "host": zod.union([zod.object({
@@ -401,13 +444,19 @@ export const ListDiscoverRoomsResponse = zod.object({
  * the mood; matchmaking fills the other 8 seats.
  * @summary Host a Room — open a new R.O.O.M. with the rider as moderator
  */
+export const hostRoomBodyVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const HostRoomBody = zod.object({
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling'])
+  "vibe": zod.string().regex(hostRoomBodyVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).')
 })
+
+export const hostRoomResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
 
 export const HostRoomResponse = zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(hostRoomResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -436,9 +485,12 @@ export const JoinRoomByIdParams = zod.object({
   "roomId": zod.coerce.string()
 })
 
+export const joinRoomByIdResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const JoinRoomByIdResponse = zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(joinRoomByIdResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -464,9 +516,12 @@ export const JoinRoomByIdResponse = zod.object({
  * 60 minutes, and joins another R.O.O.M. of the same vibe.
  * @summary Instant Escape — skip to another R.O.O.M.
  */
+export const nextRoomResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const NextRoomResponse = zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(nextRoomResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -490,6 +545,9 @@ export const NextRoomResponse = zod.object({
 /**
  * @summary Leave the current R.O.O.M. and end the ride session
  */
+export const leaveRoomResponseVibeOneRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const LeaveRoomResponse = zod.object({
   "rideId": zod.string(),
   "startedAt": zod.coerce.date(),
@@ -501,7 +559,7 @@ export const LeaveRoomResponse = zod.object({
   "peersMet": zod.number(),
   "graceCount": zod.number(),
   "graceSeconds": zod.number(),
-  "vibe": zod.union([zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),zod.null()]),
+  "vibe": zod.union([zod.string().regex(leaveRoomResponseVibeOneRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),zod.null()]),
   "endReason": zod.string()
 })
 
@@ -512,15 +570,21 @@ export const LeaveRoomResponse = zod.object({
  * locked. Everyone in the room gets `ROOM_SETTINGS_CHANGED`.
  * @summary Host controls — mood shift, automatic/manual matching, privacy lock
  */
+export const updateRoomSettingsBodyVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const UpdateRoomSettingsBody = zod.object({
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']).optional(),
+  "vibe": zod.string().regex(updateRoomSettingsBodyVibeRegExp).optional().describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "matching": zod.enum(['auto', 'manual']).optional().describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
   "locked": zod.boolean().optional()
 })
 
+export const updateRoomSettingsResponseVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const UpdateRoomSettingsResponse = zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(updateRoomSettingsResponseVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "capacity": zod.number(),
   "hostUid": zod.string().nullable().describe('The room\'s moderator (opened the room, or the longest-present rider after the host left)'),
   "matching": zod.enum(['auto', 'manual']).describe('auto = matchmaking fills open seats; manual = the host curates (off the Discovery Grid)'),
@@ -596,6 +660,9 @@ export const GetUserProfileParams = zod.object({
   "uid": zod.coerce.string()
 })
 
+export const getUserProfileResponseOneLiveOneVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const GetUserProfileResponse = zod.object({
   "uid": zod.string(),
   "displayName": zod.string(),
@@ -605,7 +672,7 @@ export const GetUserProfileResponse = zod.object({
   "followsYou": zod.boolean(),
   "live": zod.union([zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(getUserProfileResponseOneLiveOneVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "isHost": zod.boolean(),
   "memberCount": zod.number(),
   "capacity": zod.number(),
@@ -646,6 +713,9 @@ export const UnfollowUserResponse = zod.object({
 /**
  * @summary Riders you follow (friends who are riding now first)
  */
+export const listFollowingResponseUsersItemLiveOneVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const ListFollowingResponse = zod.object({
   "users": zod.array(zod.object({
   "uid": zod.string(),
@@ -656,7 +726,7 @@ export const ListFollowingResponse = zod.object({
   "followsYou": zod.boolean(),
   "live": zod.union([zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(listFollowingResponseUsersItemLiveOneVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "isHost": zod.boolean(),
   "memberCount": zod.number(),
   "capacity": zod.number(),
@@ -669,6 +739,9 @@ export const ListFollowingResponse = zod.object({
 /**
  * @summary Riders who follow you
  */
+export const listFollowersResponseUsersItemLiveOneVibeRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const ListFollowersResponse = zod.object({
   "users": zod.array(zod.object({
   "uid": zod.string(),
@@ -679,7 +752,7 @@ export const ListFollowersResponse = zod.object({
   "followsYou": zod.boolean(),
   "live": zod.union([zod.object({
   "roomId": zod.string(),
-  "vibe": zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),
+  "vibe": zod.string().regex(listFollowersResponseUsersItemLiveOneVibeRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),
   "isHost": zod.boolean(),
   "memberCount": zod.number(),
   "capacity": zod.number(),
@@ -781,6 +854,9 @@ export const ListRoomMessagesResponse = zod.array(ListRoomMessagesResponseItem)
 /**
  * @summary The rider's recent validated rides (newest first)
  */
+export const listRidesResponseVibeOneRegExp = new RegExp('^[a-z][a-z0-9_]{1,39}$');
+
+
 export const ListRidesResponseItem = zod.object({
   "rideId": zod.string(),
   "startedAt": zod.coerce.date(),
@@ -792,7 +868,7 @@ export const ListRidesResponseItem = zod.object({
   "peersMet": zod.number(),
   "graceCount": zod.number(),
   "graceSeconds": zod.number(),
-  "vibe": zod.union([zod.enum(['party_mode', 'networking', 'deep_talks', 'just_chilling']),zod.null()]),
+  "vibe": zod.union([zod.string().regex(listRidesResponseVibeOneRegExp).describe('R.O.O.M. type id from the room category catalog (`GET \/v1\/rooms\/categories`).'),zod.null()]),
   "endReason": zod.string()
 })
 export const ListRidesResponse = zod.array(ListRidesResponseItem)

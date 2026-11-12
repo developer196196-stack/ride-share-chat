@@ -1,4 +1,7 @@
-/** Sleek 9 — Vibe Selection (home tab). Live R.O.O.M. counts per vibe; joining needs VERIFIED. */
+/**
+ * Sleek 9 — Vibe Selection (home tab). Pick a group, then one of its 3 room types; live R.O.O.M.
+ * counts per type. Joining needs VERIFIED.
+ */
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,7 +18,7 @@ import {
 import { colors, withAlpha } from '@/constants/colors';
 import { radius, shadow, tintedShadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { VIBE_OPTIONS, vibeOption, vibeForRideStyle } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, ErrorBanner, Icon, Screen } from '@/components/ui';
 import { BottomTabBar, LogoTile } from '@/components/rideshare';
@@ -51,13 +54,28 @@ export default function VibeSelectionScreen() {
   const vibes = useListVibes({ query: { queryKey: getListVibesQueryKey(), enabled: isAuthenticated, refetchInterval: 10_000 } });
   const join = useJoinRoom();
   const [selected, setSelected] = useState<Vibe | null>(null);
+  const [group, setGroup] = useState<string | null>(null);
+  const catalog = useRoomCatalog();
   const [error, setError] = useState<string | null>(null);
 
   const stats = new Map((vibes.data ?? []).map((v) => [v.vibe, v]));
-  const recommended = vibeForRideStyle(me.data?.rideStyle);
-  const current: Vibe = selected ?? recommended;
-  const currentOption = vibeOption(current);
-  const recommendedOption = vibeOption(recommended);
+  const recommended = catalog.forRideStyle(me.data?.rideStyle);
+  // The admin may hide a room type while it is selected.
+  const current: Vibe = selected && catalog.isActive(selected) ? selected : recommended;
+  const currentOption = catalog.option(current);
+  const recommendedOption = catalog.option(recommended);
+  const activeGroup = group && catalog.groups.some((g) => g.id === group) ? group : currentOption.group;
+  const groupRiders = (id: string) => catalog.vibesInGroup(id).reduce((a, v) => a + (stats.get(v.value)?.riders ?? 0), 0);
+
+  const pickGroup = (id: string) => {
+    setGroup(id);
+    const first = catalog.vibesInGroup(id)[0];
+    if (currentOption.group !== id && first) setSelected(first.value);
+  };
+  const pickRecommended = () => {
+    setSelected(recommended);
+    setGroup(recommendedOption.group);
+  };
   // Traffic grace (stopped mid-ride) still counts as verified.
   const verified = state === 'VERIFIED' || state === 'GRACE';
   const totalRooms = (vibes.data ?? []).reduce((a, v) => a + v.rooms, 0);
@@ -117,18 +135,39 @@ export default function VibeSelectionScreen() {
                 : 'Matches your ride style — be the first in a new R.O.O.M.'}
             </Text>
           </View>
-          <Pressable style={styles.fireIcon} onPress={() => setSelected(recommended)} accessibilityLabel="Pick recommended vibe">
+          <Pressable style={styles.fireIcon} onPress={pickRecommended} accessibilityLabel="Pick recommended room">
             <Icon name="solarFireBold" size={18} color={colors.primaryForeground} />
           </Pressable>
         </LinearGradient>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Choose your vibe</Text>
+          <Text style={styles.sectionTitle}>Choose your room</Text>
           <Text style={styles.sectionMeta}>{totalRooms} Rolling R.O.O.M.s</Text>
         </View>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel} contentContainerStyle={styles.groupsContent}>
+          {catalog.groups.map((g) => {
+            const active = g.id === activeGroup;
+            const riders = groupRiders(g.id);
+            return (
+              <Pressable
+                key={g.id}
+                onPress={() => pickGroup(g.id)}
+                style={[styles.groupChip, active && { backgroundColor: g.color, borderColor: g.color }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Icon name={g.icon} size={16} color={active ? colors.white : g.color} />
+                <Text style={[styles.groupChipText, active && { color: colors.white }]}>{g.label}</Text>
+                {riders > 0 ? <Text style={[styles.groupChipCount, active && { color: colors.white }]}>{riders}</Text> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <Text style={styles.groupRiders}>{catalog.group(activeGroup).riders}</Text>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel} contentContainerStyle={styles.carouselContent}>
-          {VIBE_OPTIONS.map((v) => {
+          {catalog.vibesInGroup(activeGroup).map((v) => {
             const active = v.value === current;
             const s = stats.get(v.value);
             return (
@@ -331,6 +370,38 @@ const styles = StyleSheet.create({
   },
   carousel: {
     marginHorizontal: -20,
+  },
+  groupsContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  groupChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  groupChipText: {
+    ...textSize.xs,
+    fontFamily: fonts.sans.semibold,
+    color: colors.foreground,
+  },
+  groupChipCount: {
+    ...textSize['11'],
+    fontFamily: fonts.sans.bold,
+    color: colors.mutedForeground,
+  },
+  groupRiders: {
+    ...textSize.xs,
+    fontFamily: fonts.sans.regular,
+    color: colors.mutedForeground,
+    marginTop: 8,
+    marginBottom: 4,
   },
   carouselContent: {
     paddingHorizontal: 20,

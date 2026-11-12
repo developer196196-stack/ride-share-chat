@@ -10,7 +10,7 @@ import { getGetAuthMeQueryKey, useGetAuthMe, useLeaveRoom, useNextRoom } from '@
 import { colors, withAlpha } from '@/constants/colors';
 import { radius, shadow } from '@/constants/layout';
 import { routes } from '@/constants/routes';
-import { vibeOption } from '@/constants/vibes';
+import { useRoomCatalog } from '@/constants/vibes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, ErrorBanner, GlowBlob, Icon, LiveDot, Ping, Pulse, Screen } from '@/components/ui';
 import { StatRow } from '@/components/rideshare';
@@ -21,6 +21,7 @@ import { useTripStore } from '@/stores/trip.store';
 const MIN_DISPLAY_MS = 1_200;
 
 export default function FastTrackScreen() {
+  const catalog = useRoomCatalog();
   const router = useRouter();
   const next = useNextRoom();
   const leave = useLeaveRoom();
@@ -60,7 +61,7 @@ export default function FastTrackScreen() {
     router.replace(routes.discover);
   };
 
-  const vibeLabel = vibeOption(vibe).label;
+  const vibeLabel = catalog.option(vibe).label;
 
   return (
     <Screen
