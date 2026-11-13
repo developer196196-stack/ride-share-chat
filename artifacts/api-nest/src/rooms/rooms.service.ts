@@ -11,10 +11,17 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreCollections, RIDES_SUBCOLLECTION, type RideDoc } from '@workspace/firebase';
+import {
+  FirestoreCollections,
+  FOLLOWERS_SUBCOLLECTION,
+  FOLLOWING_SUBCOLLECTION,
+  RIDES_SUBCOLLECTION,
+  type RideDoc,
+} from '@workspace/firebase';
 import type { ErrorResponseBody } from '../common/error-response';
 import { requireRedis } from '../common/service-unavailable';
 import { FIRESTORE } from '../firebase/firebase.tokens';
+import { PushService } from '../notifications/push.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { REDIS } from '../redis/redis.module';
 import { ServerEvents } from '../realtime/realtime.events';
@@ -124,6 +131,7 @@ export class RoomsService implements OnModuleInit {
     private readonly profiles: ProfilesService,
     private readonly realtime: RealtimeService,
     private readonly categories: RoomCategoriesService,
+    private readonly push: PushService,
   ) {}
 
   onModuleInit(): void {
@@ -308,7 +316,44 @@ export class RoomsService implements OnModuleInit {
       await this.seat(uid, id, vibe);
       return id;
     });
+    void this.notifyFriendsLive(uid, vibe);
     return this.afterJoin(uid, roomId, vibe);
+  }
+
+  /** Room type name for notification text. */
+  private vibeLabel(vibe: Vibe): string {
+    return this.categories.catalog().types.find((t) => t.id === vibe)?.label ?? 'R.O.O.M.';
+  }
+
+  /** Friends (mutual follows) of `uid`, up to 500. */
+  private async friendsOf(uid: string): Promise<string[]> {
+    if (!this.firestore) return [];
+    const user = this.firestore.collection(FirestoreCollections.users).doc(uid);
+    const [following, followers] = await Promise.all([
+      user.collection(FOLLOWING_SUBCOLLECTION).limit(500).select().get(),
+      user.collection(FOLLOWERS_SUBCOLLECTION).limit(500).select().get(),
+    ]);
+    const followerIds = new Set(followers.docs.map((d) => d.id));
+    return following.docs.map((d) => d.id).filter((id) => followerIds.has(id));
+  }
+
+  /** "Your friend opened a room": at most once an hour per host, so hosting again doesn't spam. */
+  private async notifyFriendsLive(uid: string, vibe: Vibe): Promise<void> {
+    try {
+      if (this.redis && (await this.redis.set(`push:friendsLive:${uid}`, '1', 'EX', 60 * 60, 'NX')) !== 'OK') return;
+      const friends = await this.friendsOf(uid);
+      if (friends.length === 0) return;
+      const name = (await this.hostCard(uid)).displayName;
+      await this.push.sendToUsers(friends, {
+        kind: 'friend_live',
+        title: `${name} is riding now`,
+        body: `${name} just opened a ${this.vibeLabel(vibe)} R.O.O.M. Jump in while there's a seat.`,
+        data: { uid },
+        ttlSec: 30 * 60,
+      });
+    } catch {
+      // Notifications never block hosting.
+    }
   }
 
   /** Join a specific room from the Discovery Grid. */
@@ -722,12 +767,22 @@ export class RoomsService implements OnModuleInit {
       .set(keys.invite(roomId, target), uid, 'EX', INVITE_TTL_SEC)
       .hdel(keys.requests(roomId), target)
       .exec();
-    this.realtime.emitToUser(target, ServerEvents.ROOM_INVITE, {
+    const invite = {
       roomId,
       vibe: this.categories.resolve(meta.vibe) ?? this.categories.defaultId(),
       from: await this.hostCard(uid),
       viaRequest: opts.viaRequest === true,
       expiresAt: new Date(Date.now() + INVITE_TTL_SEC * 1000).toISOString(),
+    };
+    this.realtime.emitToUser(target, ServerEvents.ROOM_INVITE, invite);
+    void this.push.sendToUser(target, {
+      kind: 'room_invite',
+      title: invite.viaRequest ? 'You’re in!' : 'R.O.O.M. invite',
+      body: invite.viaRequest
+        ? `${invite.from.displayName} accepted your request. Tap to join their ${this.vibeLabel(invite.vibe)} R.O.O.M.`
+        : `${invite.from.displayName} invited you to their ${this.vibeLabel(invite.vibe)} R.O.O.M. Tap to join.`,
+      data: { invite },
+      ttlSec: INVITE_TTL_SEC,
     });
     return { ok: true };
   }
@@ -751,7 +806,16 @@ export class RoomsService implements OnModuleInit {
       .hset(keys.requests(roomId), uid, String(Date.now()))
       .expire(keys.requests(roomId), INVITE_TTL_SEC)
       .exec();
-    this.realtime.emitToUser(meta.hostUid, ServerEvents.ROOM_JOIN_REQUEST, { roomId, requester: await this.hostCard(uid) });
+    const requester = await this.hostCard(uid);
+    this.realtime.emitToUser(meta.hostUid, ServerEvents.ROOM_JOIN_REQUEST, { roomId, requester });
+    void this.push.sendToUser(meta.hostUid, {
+      kind: 'join_request',
+      title: 'Request to join',
+      body: `${requester.displayName} asked for a seat in your R.O.O.M.`,
+      data: { roomId, uid },
+      ttlSec: INVITE_TTL_SEC,
+      dedupe: { key: `request:${roomId}:${uid}`, sec: INVITE_TTL_SEC },
+    });
     return { ok: true };
   }
 

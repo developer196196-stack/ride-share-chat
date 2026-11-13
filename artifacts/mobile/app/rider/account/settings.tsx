@@ -20,6 +20,7 @@ import { routes } from '@/constants/routes';
 import { fonts, textSize, tracking } from '@/constants/typography';
 import { Button, Card, Divider, Icon, IconButton, Screen } from '@/components/ui';
 import { BottomTabBar } from '@/components/rideshare';
+import { unregisterPush } from '@/lib/notifications/push';
 import { useAuthStore } from '@/stores/auth.store';
 import { useTripStore } from '@/stores/trip.store';
 
@@ -59,6 +60,8 @@ export default function SettingsScreen() {
 
   const logout = async () => {
     useTripStore.getState().reset();
+    // While still signed in: this phone stops getting this rider's notifications.
+    await unregisterPush();
     await signOut();
     queryClient.clear();
     router.replace(routes.phoneAuth);
@@ -132,6 +135,13 @@ export default function SettingsScreen() {
                   : 'Native language, translation, subtitles'
               }
               onPress={() => router.push(routes.languageSettings)}
+            />
+            <Divider />
+            <SettingsRow
+              icon="mdiBell"
+              title="Notifications"
+              caption="Room invites, friends riding now, new followers"
+              onPress={() => router.push(routes.notifications)}
             />
             <Divider />
             <SettingsRow

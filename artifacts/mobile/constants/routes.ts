@@ -18,6 +18,7 @@ export const routes = {
   languageSettings: '/rider/account/language',
   safetyContacts: '/rider/account/safety-contacts',
   network: '/rider/account/network',
+  notifications: '/rider/account/notifications',
 } as const;
 
 export type AppRoute = (typeof routes)[keyof typeof routes];

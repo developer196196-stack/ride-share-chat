@@ -1107,6 +1107,48 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "503":
           $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/me/push-tokens:
+    post:
+      operationId: registerPushToken
+      tags: [preferences]
+      summary: Register this device for push notifications (Expo push token)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenInput"
+      responses:
+        "204":
+          description: Registered
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
+  /v1/me/push-tokens/remove:
+    post:
+      operationId: removePushToken
+      tags: [preferences]
+      summary: Stop push notifications to this device (sign-out)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemovePushTokenInput"
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/FirebaseUnavailable"
   /v1/safety/share-links:
     post:
       operationId: createShareLink
@@ -1923,7 +1965,36 @@ components:
         promptShareOnVerified:
           type: boolean
           description: Offer a one-tap "Share my trip" when the rider becomes VERIFIED
+        notifyNewFollowers:
+          type: boolean
+          description: Push notification when someone follows you (always returned; optional on save)
+        notifyRoomInvites:
+          type: boolean
+          description: Push notification for room invites, accepted requests and join requests to your room
+        notifyFriendsLive:
+          type: boolean
+          description: Push notification when a friend opens a R.O.O.M.
       required: [nativeLanguage, autoTranslate, subtitleSize, subtitleStyle, promptShareOnVerified]
+    PushTokenInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Expo push token, e.g. ExponentPushToken[xxxx]
+        platform:
+          type: string
+          enum: [ios, android]
+      required: [token, platform]
+    RemovePushTokenInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required: [token]
     ContactChannel:
       type: string
       enum: [sms, whatsapp, email]

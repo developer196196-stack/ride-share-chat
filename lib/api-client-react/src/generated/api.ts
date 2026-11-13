@@ -42,6 +42,8 @@ import type {
   ProfilePhotoUploadRequest,
   PublicProfile,
   PublicShareStatus,
+  PushTokenInput,
+  RemovePushTokenInput,
   ReportRequest,
   ReportResult,
   RideSummary,
@@ -2916,6 +2918,148 @@ export const useDeleteTrustedContact = <TError = ErrorType<UnauthorizedResponse 
         TContext
       > => {
       return useMutation(getDeleteTrustedContactMutationOptions(options));
+    }
+
+export const getRegisterPushTokenUrl = () => {
+
+
+
+
+  return `/api/v1/me/push-tokens`
+}
+
+/**
+ * @summary Register this device for push notifications (Expo push token)
+ */
+export const registerPushToken = async (pushTokenInput: PushTokenInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRegisterPushTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(pushTokenInput)
+  }
+);}
+
+
+
+
+
+export const getRegisterPushTokenMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationErrorResponse | FirebaseUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerPushToken>>, TError,{data: BodyType<PushTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerPushToken>>, TError,{data: BodyType<PushTokenInput>}, TContext> => {
+
+const mutationKey = ['registerPushToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerPushToken>>, {data: BodyType<PushTokenInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerPushToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterPushTokenMutationResult = NonNullable<Awaited<ReturnType<typeof registerPushToken>>>
+    export type RegisterPushTokenMutationBody = BodyType<PushTokenInput>
+    export type RegisterPushTokenMutationError = ErrorType<UnauthorizedResponse | ValidationErrorResponse | FirebaseUnavailableResponse>
+
+    /**
+ * @summary Register this device for push notifications (Expo push token)
+ */
+export const useRegisterPushToken = <TError = ErrorType<UnauthorizedResponse | ValidationErrorResponse | FirebaseUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerPushToken>>, TError,{data: BodyType<PushTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerPushToken>>,
+        TError,
+        {data: BodyType<PushTokenInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterPushTokenMutationOptions(options));
+    }
+
+export const getRemovePushTokenUrl = () => {
+
+
+
+
+  return `/api/v1/me/push-tokens/remove`
+}
+
+/**
+ * @summary Stop push notifications to this device (sign-out)
+ */
+export const removePushToken = async (removePushTokenInput: RemovePushTokenInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRemovePushTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(removePushTokenInput)
+  }
+);}
+
+
+
+
+
+export const getRemovePushTokenMutationOptions = <TError = ErrorType<UnauthorizedResponse | FirebaseUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePushToken>>, TError,{data: BodyType<RemovePushTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removePushToken>>, TError,{data: BodyType<RemovePushTokenInput>}, TContext> => {
+
+const mutationKey = ['removePushToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removePushToken>>, {data: BodyType<RemovePushTokenInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  removePushToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemovePushTokenMutationResult = NonNullable<Awaited<ReturnType<typeof removePushToken>>>
+    export type RemovePushTokenMutationBody = BodyType<RemovePushTokenInput>
+    export type RemovePushTokenMutationError = ErrorType<UnauthorizedResponse | FirebaseUnavailableResponse>
+
+    /**
+ * @summary Stop push notifications to this device (sign-out)
+ */
+export const useRemovePushToken = <TError = ErrorType<UnauthorizedResponse | FirebaseUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePushToken>>, TError,{data: BodyType<RemovePushTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removePushToken>>,
+        TError,
+        {data: BodyType<RemovePushTokenInput>},
+        TContext
+      > => {
+      return useMutation(getRemovePushTokenMutationOptions(options));
     }
 
 export const getCreateShareLinkUrl = () => {

@@ -4,8 +4,9 @@ import { Camera } from 'expo-camera';
 import * as Location from 'expo-location';
 import { DeviceMotion } from 'expo-sensors';
 import { ActivityRecognition } from '@/modules/activity-recognition';
+import { getNotificationPermission, registerForPush, requestNotificationPermission } from '@/lib/notifications/push';
 
-export type PermissionKey = 'media' | 'location' | 'motion';
+export type PermissionKey = 'media' | 'location' | 'motion' | 'notifications';
 
 export type PermissionStatusMap = Record<PermissionKey, boolean>;
 
@@ -18,7 +19,7 @@ async function safe(fn: () => Promise<boolean>): Promise<boolean> {
 }
 
 export async function getPermissionStatus(): Promise<PermissionStatusMap> {
-  const [camera, mic, location, motion] = await Promise.all([
+  const [camera, mic, location, motion, notifications] = await Promise.all([
     safe(async () => (await Camera.getCameraPermissionsAsync()).granted),
     safe(async () => (await Camera.getMicrophonePermissionsAsync()).granted),
     safe(async () => (await Location.getForegroundPermissionsAsync()).granted),
@@ -28,8 +29,12 @@ export async function getPermissionStatus(): Promise<PermissionStatusMap> {
       const activity = ActivityRecognition.isSupported() ? (await ActivityRecognition.getPermissionsAsync()).granted : true;
       return sensors && activity;
     }),
+    safe(async () => {
+      const p = await getNotificationPermission();
+      return p === 'granted' || p === 'unsupported';
+    }),
   ]);
-  return { media: camera && mic, location, motion };
+  return { media: camera && mic, location, motion, notifications };
 }
 
 export async function requestPermission(key: PermissionKey): Promise<boolean> {
@@ -48,6 +53,11 @@ export async function requestPermission(key: PermissionKey): Promise<boolean> {
         ? await safe(async () => (await ActivityRecognition.requestPermissionsAsync()).granted)
         : true;
       return sensors && activity;
+    }
+    case 'notifications': {
+      const granted = await requestNotificationPermission();
+      if (granted) void registerForPush();
+      return granted;
     }
   }
 }

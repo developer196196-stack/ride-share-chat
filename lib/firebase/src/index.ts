@@ -18,6 +18,7 @@ export type {
   UserDoc,
   RideStyle,
   UserPreferencesDoc,
+  PushTokenDoc,
   ContactChannel,
   TrustedContactDoc,
   ShareLinkDoc,

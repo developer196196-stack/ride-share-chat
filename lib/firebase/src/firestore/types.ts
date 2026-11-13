@@ -40,6 +40,18 @@ export type UserPreferencesDoc = {
   subtitleSize: 'sm' | 'md' | 'lg';
   subtitleStyle: 'bubble' | 'subtitle';
   promptShareOnVerified: boolean;
+  /** Push notifications per kind (unset = on). */
+  notifyNewFollowers?: boolean;
+  notifyRoomInvites?: boolean;
+  notifyFriendsLive?: boolean;
+};
+
+/** `pushTokens/{sha256(token)}`: an Expo push token and the rider signed in on that device. */
+export type PushTokenDoc = {
+  uid: string;
+  token: string;
+  platform: 'ios' | 'android';
+  updatedAt: Timestamp;
 };
 
 export type ContactChannel = 'sms' | 'whatsapp' | 'email';
