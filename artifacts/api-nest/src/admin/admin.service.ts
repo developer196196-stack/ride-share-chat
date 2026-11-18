@@ -28,6 +28,7 @@ import type { ErrorResponseBody } from '../common/error-response';
 import { requireFirestore } from '../common/require-firestore';
 import { validationError } from '../common/zod-parse';
 import { DEVICE_BLOCKED_MESSAGE, DevicesService } from '../devices/devices.service';
+import { TestOverridesService, type OverrideKind } from '../validation/test-overrides.service';
 import type { CreateRiderInput } from './admin.controller';
 import { SUSPENDED_MESSAGE, SUSPENDED_SET } from '../common/suspension';
 import { FIRESTORE } from '../firebase/firebase.tokens';
@@ -79,6 +80,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     private readonly realtime: RealtimeService,
     private readonly categories: RoomCategoriesService,
     private readonly devices: DevicesService,
+    private readonly testOverrides: TestOverridesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -167,6 +169,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       /** In traffic grace or the post-ride extension. */
       onHold,
       validationOverrides: Object.keys(getValidationOverrides()).length,
+      /** Testing overrides switched on for every rider (shown as a warning). */
+      testOverridesForAll: (['desktop', 'system'] as const).filter((k) => this.testOverrides.get()[k].scope === 'all'),
       byVibe: vibes,
     };
   }
@@ -277,6 +281,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       reportsAgainst: against.docs.map(toReport).sort(byDate),
       reportsBy: by.docs.map(toReport).sort(byDate),
       devices,
+      testOverrides: {
+        ...this.testOverrides.forRider(uid),
+        desktopForAll: this.testOverrides.get().desktop.scope === 'all',
+        systemForAll: this.testOverrides.get().system.scope === 'all',
+      },
     };
   }
 
@@ -431,6 +440,33 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     this.profiles.invalidate(uid);
     this.logger.log(`Rider ${uid} deleted by ${adminEmail ?? 'admin'}`);
     return { ok: true };
+  }
+
+  // ---------------------------------------------------------------- testing overrides
+
+  /** Desktop / System override settings, with names for the selected riders. */
+  async getTestOverrides() {
+    const settings = this.testOverrides.get();
+    const uids = [...new Set([...settings.desktop.uids, ...settings.system.uids])];
+    const profiles = await this.profiles.getMany(uids);
+    return {
+      ...settings,
+      riders: uids.map((uid) => ({ uid, displayName: profiles.get(uid)?.displayName ?? 'Rider' })),
+    };
+  }
+
+  async saveTestOverrides(input: unknown, adminEmail: string | null) {
+    await this.testOverrides.save(input, adminEmail);
+    return this.getTestOverrides();
+  }
+
+  /** Rider page switches. */
+  async setRiderTestOverrides(uid: string, input: Partial<Record<OverrideKind, boolean>>, adminEmail: string | null) {
+    if (!(await this.users().doc(uid).get()).exists) notFound('That rider does not exist.');
+    for (const kind of ['desktop', 'system'] as const) {
+      if (input[kind] != null) await this.testOverrides.setForRider(uid, kind, input[kind]!, adminEmail);
+    }
+    return this.testOverrides.forRider(uid);
   }
 
   // ---------------------------------------------------------------- devices

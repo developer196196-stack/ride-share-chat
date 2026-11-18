@@ -1,4 +1,4 @@
-import { Flag, Gauge, LayoutGrid, Radio, Shapes, ShieldAlert, Users, type LucideIcon } from 'lucide-react';
+import { Flag, Gauge, LayoutGrid, Radio, ShieldAlert, Users, type LucideIcon } from 'lucide-react';
 
 export type NavItem = { href: string; label: string; icon: LucideIcon; n: string };
 
@@ -6,11 +6,11 @@ export type NavItem = { href: string; label: string; icon: LucideIcon; n: string
 export const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutGrid, n: '01' },
   { href: '/dashboard/riders', label: 'Rider Management', icon: Users, n: '02' },
-  { href: '/dashboard/settings', label: 'Trip Validation', icon: Gauge, n: '03' },
-  { href: '/dashboard/categories', label: 'Room Categories', icon: Shapes, n: '04' },
-  { href: '/dashboard/rooms', label: 'Live R.O.O.M.s', icon: Radio, n: '05' },
-  { href: '/dashboard/safety', label: 'Safety Alerts', icon: ShieldAlert, n: '06' },
-  { href: '/dashboard/reports', label: 'Reports', icon: Flag, n: '07' },
+  // Room Categories now lives here (room types section); /dashboard/categories redirects.
+  { href: '/dashboard/settings', label: 'Trip Validation & Modes', icon: Gauge, n: '03' },
+  { href: '/dashboard/rooms', label: 'Live R.O.O.M.s', icon: Radio, n: '04' },
+  { href: '/dashboard/safety', label: 'Safety Alerts', icon: ShieldAlert, n: '05' },
+  { href: '/dashboard/reports', label: 'Reports', icon: Flag, n: '06' },
 ];
 
 export function isActive(item: NavItem, pathname: string): boolean {

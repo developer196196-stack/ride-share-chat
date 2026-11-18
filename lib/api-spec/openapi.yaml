@@ -1715,6 +1715,14 @@ components:
         joinedAt:
           type: string
           format: date-time
+        openedAt:
+          type: string
+          format: date-time
+          description: When the room opened
+        closesAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the transit mode's time limit (Max room) closes the room; null = no limit
       required: [roomId, vibe, capacity, hostUid, matching, locked, members, livekit, joinedAt]
     RoomMatching:
       type: string

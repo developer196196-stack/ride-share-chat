@@ -70,6 +70,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (store.room?.roomId === payload.roomId) store.setRoom(null);
       store.setNotice({ message: payload.message, tone: 'warning' });
     });
+    socket.on(ServerEvents.ROOM_NOTICE, (payload: ModerationNoticePayload) => {
+      // e.g. "This R.O.O.M. closes in 2 minutes" (the transit mode's time limit).
+      const store = useTripStore.getState();
+      if (store.room?.roomId === payload.roomId) store.setNotice({ message: payload.message, tone: 'warning' });
+    });
     socket.on(ServerEvents.FORCE_MUTED, (payload: ModerationNoticePayload) => {
       const store = useTripStore.getState();
       if (store.room?.roomId !== payload.roomId) return;

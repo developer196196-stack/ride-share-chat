@@ -18,6 +18,7 @@ import {
   DEFAULT_CATALOG,
   LEGACY_VIBES,
   type CategoryCatalog,
+  type CategoryGroup,
 } from './room-categories';
 import type { Vibe } from './rooms.types';
 
@@ -92,6 +93,13 @@ export class RoomCategoriesService implements OnModuleInit, OnModuleDestroy {
     if (!value) return null;
     if (this.current.types.some((t) => t.id === value)) return value;
     return LEGACY_VIBES[value] ?? value;
+  }
+
+  /** The transit mode (group) a room type belongs to. */
+  modeOf(vibe: Vibe | null | undefined): CategoryGroup | null {
+    const id = this.resolve(vibe);
+    const groupId = this.current.types.find((t) => t.id === id)?.groupId;
+    return this.current.groups.find((g) => g.id === groupId) ?? null;
   }
 
   /** Fallback for a room whose stored type is missing. */

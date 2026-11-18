@@ -27,6 +27,10 @@ export type RoomSessionDto = {
   members: RoomMemberDto[];
   livekit: { url: string; token: string } | null;
   joinedAt: string;
+  /** When the room opened. */
+  openedAt: string;
+  /** When the transit mode's time limit closes the room; null = no limit. */
+  closesAt: string | null;
 };
 
 export type RoomHostDto = {

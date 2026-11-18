@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
-const SECTIONS = ['Overview', 'Rider Management', 'Trip Validation', 'Room Categories', 'Live R.O.O.M.s', 'Safety Alerts', 'Reports'];
+const SECTIONS = ['Overview', 'Rider Management', 'Trip Validation & Modes', 'Live R.O.O.M.s', 'Safety Alerts', 'Reports'];
 
 export default function LoginPage() {
   const { login, loading, authError } = useAuth();

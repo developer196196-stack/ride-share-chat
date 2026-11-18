@@ -20,8 +20,10 @@ import {
   reduceSample,
   sweepState,
   toSnapshot,
+  verifyForTesting,
   type ReduceResult,
 } from './validation.engine';
+import { TestOverridesService } from './test-overrides.service';
 import { RoadMatcher } from './road-matcher';
 import type { EngineState, TelemetrySample, TerminationReason, ValidationSnapshot } from './validation.types';
 
@@ -76,6 +78,7 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
     @Inject(REDIS) private readonly redis: Redis | null,
     private readonly realtime: RealtimeService,
     private readonly roads: RoadMatcher,
+    private readonly overrides: TestOverridesService,
   ) {}
 
   onModuleInit(): void {
@@ -128,7 +131,19 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getState(uid: string): Promise<EngineState> {
-    return (await this.load(uid)) ?? createInitialState(Date.now());
+    const state = (await this.load(uid)) ?? createInitialState(Date.now());
+    // Desktop override: a tester with no sensors sends no telemetry, so verify on the state read
+    // the app makes when a trip starts (and every later read).
+    if (state.state !== 'VERIFIED' && state.state !== 'TERMINATED' && this.overrides.forRider(uid).desktop) {
+      return this.serial(uid, async () => {
+        const prev = (await this.load(uid)) ?? createInitialState(Date.now());
+        const next = verifyForTesting(prev, Date.now());
+        await this.save(uid, next);
+        await this.publish(uid, { next, previousState: prev.state, stateChanged: next.state !== prev.state });
+        return next;
+      });
+    }
+    return state;
   }
 
   async getSnapshot(uid: string): Promise<ValidationSnapshot> {
@@ -151,7 +166,8 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
     return this.serial(uid, async () => {
       const now = Date.now();
       const prev = (await this.load(uid)) ?? createInitialState(now);
-      const result = reduceSample(prev, sample, now, { allowSimulated: this.allowSimulated });
+      const { desktop, system } = this.overrides.forRider(uid);
+      const result = reduceSample(prev, sample, now, { allowSimulated: this.allowSimulated, desktop, system });
       await this.save(uid, result.next);
 
       const redis = requireRedis(this.redis);
@@ -182,7 +198,8 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
     return this.serial(uid, async () => {
       const now = Date.now();
       const prev = await this.load(uid);
-      const next = createInitialState(now);
+      const fresh = createInitialState(now);
+      const next = this.overrides.forRider(uid).desktop ? verifyForTesting(fresh, now) : fresh;
       await this.save(uid, next);
       await this.publish(uid, { next, previousState: prev?.state ?? 'PENDING', stateChanged: prev?.state !== 'PENDING' });
       return toSnapshot(next, now);
@@ -280,7 +297,7 @@ export class ValidationService implements OnModuleInit, OnModuleDestroy {
             await redis.zrem(keys.lastSeen, uid);
             return;
           }
-          const result = sweepState(prev, Date.now());
+          const result = sweepState(prev, Date.now(), { desktop: this.overrides.forRider(uid).desktop });
           await this.save(uid, result.next);
           if (result.stateChanged) await this.publish(uid, result);
         });

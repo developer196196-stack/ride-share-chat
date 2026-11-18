@@ -105,8 +105,16 @@ export function scoreGroundTruth(activity: number | null, road: RoadCheck | null
   return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
-export function combineScore(modules: ModuleScores): number {
+export function combineScore(modules: ModuleScores, opts: { withoutGroundTruth?: boolean } = {}): number {
   const w = C.weights;
+  if (opts.withoutGroundTruth && modules.groundTruth == null) {
+    // System override with no road check yet: GPS and vibration share the whole weight, so the
+    // missing phone reading doesn't hold the score at the neutral value.
+    const sum = w.gps + w.vibration || 1;
+    return clamp(
+      ((modules.gps ?? C.neutralModuleScore) * w.gps + (modules.vibration ?? C.neutralModuleScore) * w.vibration) / sum,
+    );
+  }
   return clamp(
     (modules.gps ?? C.neutralModuleScore) * w.gps +
       (modules.vibration ?? C.neutralModuleScore) * w.vibration +
@@ -152,6 +160,42 @@ function exitVehicle(state: EngineState, now: number): EngineState {
 const postRideOver = (s: EngineState, now: number) =>
   s.state === 'POST_RIDE' && s.postRideDeadline != null && now >= s.postRideDeadline;
 
+export type ReduceOptions = {
+  allowSimulated: boolean;
+  /** Desktop override: the trip counts as verified without real movement. */
+  desktop?: boolean;
+  /** System override: ignore the phone's in-vehicle reading (OS activity recognition). */
+  system?: boolean;
+};
+
+/**
+ * Desktop override: a live trip is VERIFIED with a full score, whatever the sensors say. An ended
+ * trip stays ended until the rider starts a new one (reset).
+ */
+export function verifyForTesting(prev: EngineState, now: number, fix?: GpsReading): EngineState {
+  if (prev.state === 'TERMINATED') return { ...prev, lastSampleAt: now, updatedAt: now };
+  const fresh = prev.state === 'PENDING';
+  return {
+    ...prev,
+    state: 'VERIFIED',
+    score: 100,
+    modules: { gps: 100, vibration: 100, groundTruth: 100 },
+    aboveSince: null,
+    belowSince: null,
+    lowScoreSince: null,
+    walkingSince: null,
+    suspicionSince: null,
+    graceDeadline: null,
+    graceStartedAt: null,
+    postRideDeadline: null,
+    verifiedAt: fresh ? now : (prev.verifiedAt ?? now),
+    stats: fresh ? { startedAt: now, distanceM: 0, movingMs: 0, graceCount: 0, graceMs: 0 } : prev.stats,
+    lastFix: fix ?? prev.lastFix,
+    lastSampleAt: now,
+    updatedAt: now,
+  };
+}
+
 /**
  * Applies one telemetry sample. `now` is server time. Modules missing from the sample keep
  * their previous value (clients may send vibration and GPS at different rates).
@@ -160,10 +204,17 @@ export function reduceSample(
   prev: EngineState,
   sample: TelemetrySample,
   now: number,
-  opts: { allowSimulated: boolean } = { allowSimulated: false },
+  opts: ReduceOptions = { allowSimulated: false },
 ): ReduceResult {
   const previousState = prev.state;
+  if (opts.desktop) {
+    const next = verifyForTesting(prev, now, sample.gps && !sample.gps.lowPower ? sample.gps : undefined);
+    return { next, stateChanged: next.state !== previousState, previousState };
+  }
+  // System override: drop the phone's activity reading before anything uses it.
+  if (opts.system && sample.activity) sample = { ...sample, activity: undefined };
   let s: EngineState = { ...prev, stats: { ...prev.stats }, lastSampleAt: now, updatedAt: now };
+  if (opts.system) s.activityScore = null;
   // Spoof checks are skipped for allowed simulated rides, or when disabled for testing.
   const devBypass = (opts.allowSimulated && sample.simulated === true) || !C.spoof.enabled;
 
@@ -224,7 +275,7 @@ export function reduceSample(
   s.suspicionSince = noVehicleSignal && !devBypass ? (prev.suspicionSince ?? now) : null;
 
   // ---- Score --------------------------------------------------------------
-  let raw = combineScore(s.modules);
+  let raw = combineScore(s.modules, { withoutGroundTruth: opts.system });
   if (s.suspicionSince && now - s.suspicionSince >= C.spoof.suspicionSustainMs) {
     raw = clamp(raw - C.spoof.suspicionPenalty);
   }
@@ -283,8 +334,12 @@ export function reduceSample(
 }
 
 /** Time-based transitions for riders who stopped sending telemetry. */
-export function sweepState(prev: EngineState, now: number): ReduceResult {
+export function sweepState(prev: EngineState, now: number, opts: { desktop?: boolean } = {}): ReduceResult {
   const previousState = prev.state;
+  // Desktop override: no sensors to lose, so the trip never times out on its own.
+  if (opts.desktop && prev.state !== 'TERMINATED') {
+    return { next: { ...prev, lastSampleAt: now }, stateChanged: false, previousState };
+  }
   let s = prev;
   if (prev.state === 'GRACE' && prev.graceDeadline != null && now >= prev.graceDeadline) {
     s = terminate({ ...prev, updatedAt: now }, 'grace_expired', now);

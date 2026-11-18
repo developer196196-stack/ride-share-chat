@@ -30,6 +30,7 @@ import { fonts, textSize } from '@/constants/typography';
 import { ErrorBanner, Icon, LiveDot, Screen } from '@/components/ui';
 import { ChatOverlay } from '@/components/room/ChatOverlay';
 import { ReportSheet } from '@/components/room/ReportSheet';
+import { RoomTimer } from '@/components/room/RoomTimer';
 import { VideoRoom, type MediaControls, type ModerationAction, type VideoEndReason } from '@/components/room/VideoRoom';
 import { SafetyFab } from '@/components/safety/SafetyFab';
 import { FocusFollow } from '@/components/social/FocusFollow';
@@ -276,6 +277,8 @@ export default function ActiveRoomScreen() {
             <SafetyFab inline />
           </View>
         </View>
+
+        <RoomTimer openedAt={room.openedAt} closesAt={room.closesAt} />
 
         {isHost && moodsOpen ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moods} contentContainerStyle={styles.moodsContent}>

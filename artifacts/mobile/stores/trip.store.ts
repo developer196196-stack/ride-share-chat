@@ -48,7 +48,10 @@ type TripState = {
   addMember: (roomId: string, member: RoomMember) => void;
   removeMember: (roomId: string, uid: string) => void;
   setHost: (roomId: string, hostUid: string) => void;
-  setRoomSettings: (roomId: string, settings: { vibe: Vibe; matching: RoomMatching; locked: boolean }) => void;
+  setRoomSettings: (
+    roomId: string,
+    settings: { vibe: Vibe; matching: RoomMatching; locked: boolean; openedAt?: string; closesAt?: string | null },
+  ) => void;
   setMessages: (messages: ChatMessage[]) => void;
   addMessage: (message: ChatMessage) => void;
   setSummary: (summary: RideSummary | null) => void;

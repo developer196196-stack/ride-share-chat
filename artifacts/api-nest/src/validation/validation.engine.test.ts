@@ -7,7 +7,9 @@ import {
   needsRoadCheck,
   reduceSample,
   sweepState,
+  verifyForTesting,
 } from './validation.engine';
+import { NO_OVERRIDES, overridesFor } from './test-overrides.service';
 import type { EngineState, TelemetrySample } from './validation.types';
 
 const MPH = 0.44704;
@@ -265,5 +267,59 @@ describe('Trip Validation Engine', () => {
       sample(t, 0, { vib: 0.01, activity: { type: 'still', confidence: 80 } }),
     );
     assert.equal(s.state, 'PENDING');
+  });
+
+  it('desktop override: verified with no movement, emulator or fake GPS, and never times out', () => {
+    let s = createInitialState(T0);
+    const still = { ...sample(T0, 0, { vib: 0.01, mock: true }), device: { isEmulator: true } };
+    s = reduceSample(s, still, T0, { allowSimulated: false, desktop: true }).next;
+    assert.equal(s.state, 'VERIFIED');
+    assert.equal(s.verifiedAt, T0);
+    // No telemetry for an hour: still verified with the override, lost signal without it.
+    const later = T0 + 60 * 60_000;
+    assert.equal(sweepState(s, later, { desktop: true }).next.state, 'VERIFIED');
+    assert.equal(sweepState(s, later).next.state, 'GRACE');
+  });
+
+  it('desktop override: an ended trip stays ended until a new one starts', () => {
+    const ended = { ...createInitialState(T0), state: 'TERMINATED' as const, terminationReason: 'user_ended' as const };
+    assert.equal(verifyForTesting(ended, T0).state, 'TERMINATED');
+    assert.equal(verifyForTesting(createInitialState(T0), T0).state, 'VERIFIED');
+  });
+
+  it('system override: a real ride verifies even when the phone says "walking"', () => {
+    const walkingReading = { type: 'walking' as const, confidence: 90 };
+    const make = (t: number) => sample(t, 25, { activity: walkingReading });
+    let normal = createInitialState(T0);
+    let overridden = createInitialState(T0);
+    for (let t = T0; t <= T0 + 30_000; t += 2_000) {
+      normal = reduceSample(normal, make(t), t).next;
+      overridden = reduceSample(overridden, make(t), t, { allowSimulated: false, system: true }).next;
+    }
+    assert.notEqual(normal.state, 'VERIFIED');
+    assert.equal(overridden.state, 'VERIFIED', `score ${overridden.score}`);
+    assert.equal(overridden.activityScore, null);
+  });
+
+  it('system override still needs real movement', () => {
+    const s = drive(createInitialState(T0), T0, T0 + 30_000, 2_000, (t) => sample(t, 0, { vib: 0.01 }));
+    const overridden = [T0, T0 + 10_000, T0 + 20_000].reduce(
+      (st, t) => reduceSample(st, sample(t, 0, { vib: 0.01 }), t, { allowSimulated: false, system: true }).next,
+      createInitialState(T0),
+    );
+    assert.equal(s.state, 'PENDING');
+    assert.equal(overridden.state, 'PENDING');
+  });
+});
+
+describe('testing overrides: who they apply to', () => {
+  it('off, everyone, or selected riders', () => {
+    assert.deepEqual(overridesFor(NO_OVERRIDES, 'amy'), { desktop: false, system: false });
+    const settings = {
+      desktop: { scope: 'riders' as const, uids: ['amy'] },
+      system: { scope: 'all' as const, uids: [] },
+    };
+    assert.deepEqual(overridesFor(settings, 'amy'), { desktop: true, system: true });
+    assert.deepEqual(overridesFor(settings, 'bob'), { desktop: false, system: true });
   });
 });

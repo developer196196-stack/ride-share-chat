@@ -8,6 +8,8 @@ export type ProfileSummary = {
   displayName: string;
   homeCity: string | null;
   photoUrl: string | null;
+  /** ISO country of the rider's phone number (nationwide matching). */
+  countryCode: string | null;
 };
 
 const CACHE_TTL_MS = 5 * 60_000;
@@ -57,6 +59,7 @@ export class ProfilesService {
           displayName: doc?.displayName ?? 'Rider',
           homeCity: doc?.homeCity ?? null,
           photoUrl,
+          countryCode: doc?.countryCode ?? null,
         };
         this.cache.set(uid, { value, expiresAt: now + CACHE_TTL_MS });
         result.set(uid, value);
@@ -71,5 +74,5 @@ export class ProfilesService {
 }
 
 function fallback(uid: string): ProfileSummary {
-  return { uid, displayName: 'Rider', homeCity: null, photoUrl: null };
+  return { uid, displayName: 'Rider', homeCity: null, photoUrl: null, countryCode: null };
 }
