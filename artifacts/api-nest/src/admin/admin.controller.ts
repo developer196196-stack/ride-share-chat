@@ -22,7 +22,9 @@ const CreateRiderBody = z.object({
 });
 export type CreateRiderInput = z.infer<typeof CreateRiderBody>;
 
-const SettingsBody =z.object({ values: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])) });
+const RiderOverridesBody = z.object({ desktop: z.boolean().optional(), system: z.boolean().optional() });
+
+const SettingsBody = z.object({ values: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])) });
 
 /**
  * Admin panel API (artifacts/admin-web). Not part of the rider OpenAPI contract: admins sign in
@@ -155,6 +157,21 @@ export class AdminController {
   @Get('safety-alerts')
   safetyAlerts() {
     return this.admin.listSafetyAlerts();
+  }
+
+  @Get('settings/test-overrides')
+  testOverrides() {
+    return this.admin.getTestOverrides();
+  }
+
+  @Put('settings/test-overrides')
+  saveTestOverrides(@Req() req: AdminRequest, @Body() body: unknown) {
+    return this.admin.saveTestOverrides(body, req.user!.email ?? null);
+  }
+
+  @Put('users/:uid/test-overrides')
+  riderTestOverrides(@Req() req: AdminRequest, @Param('uid') uid: string, @Body() body: unknown) {
+    return this.admin.setRiderTestOverrides(uid, parseBody(RiderOverridesBody, body), req.user!.email ?? null);
   }
 
   @Get('settings/validation')

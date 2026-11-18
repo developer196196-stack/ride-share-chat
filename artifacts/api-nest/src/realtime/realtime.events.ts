@@ -26,6 +26,8 @@ export const ServerEvents = {
   ROOM_EJECTED: 'ROOM_EJECTED',
   /** To the muted rider only: turn the local microphone off and show the notice. */
   FORCE_MUTED: 'FORCE_MUTED',
+  /** To a room's riders: a notice such as "This R.O.O.M. closes in 2 minutes" ({ roomId, message }). */
+  ROOM_NOTICE: 'ROOM_NOTICE',
   /** To the invitee: the host invited you (or accepted your join request). */
   ROOM_INVITE: 'ROOM_INVITE',
   /** To the host: a friend asks for a seat in your private room. */

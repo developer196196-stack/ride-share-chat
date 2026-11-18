@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Ban, Copy, Pencil, Phone, Power, RotateCcw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { BlockDeviceDialog } from '@/components/block-device-dialog';
+import { RiderTestingPanel, type RiderTestOverrides } from '@/components/trip-modes/rider-testing-panel';
 import { DeleteRiderDialog } from '@/components/delete-rider-dialog';
 import { RiderFormDialog } from '@/components/rider-form-dialog';
 import { useAdminQuery } from '@/hooks/use-admin-query';
@@ -89,6 +90,7 @@ type RiderDetail = {
   reportsAgainst: ReportRow[];
   reportsBy: ReportRow[];
   devices: Device[];
+  testOverrides: RiderTestOverrides;
 };
 
 const END_REASONS: Record<string, string> = {
@@ -359,6 +361,10 @@ export default function RiderDetailPage() {
           </TableBody>
         </Table>
       </Panel>
+
+      {data.testOverrides ? (
+        <RiderTestingPanel uid={data.uid} overrides={data.testOverrides} onChanged={() => void reload()} />
+      ) : null}
 
       <Panel
         eyebrow="Devices"

@@ -1,205 +1,275 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { RotateCcw, Save } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { adminApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ErrorAlert, PageHeader, StatusBadge } from '@/components/page-header';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { ErrorAlert, PageHeader, Panel, StatusBadge } from '@/components/page-header';
+import { CalibrationPanel } from '@/components/trip-modes/calibration-panel';
+import { ModesTable } from '@/components/trip-modes/modes-table';
+import {
+  OverridesPanel,
+  toOverridesDraft,
+  type OverridesDraft,
+  type OverridesResponse,
+} from '@/components/trip-modes/overrides-panel';
+import {
+  catalogPayload,
+  RoomTypesEditor,
+  toDraft,
+  type CatalogResponse,
+  type Draft as CatalogDraft,
+} from '@/components/trip-modes/room-types-editor';
+import {
+  AdvancedCalibration,
+  settingsPayload,
+  shownValue,
+  type SettingsDraft,
+  type SettingsResponse,
+} from '@/components/trip-modes/validation-settings';
 
-type Setting = {
-  key: string;
-  group: string;
-  label: string;
-  help: string;
-  kind: 'number' | 'boolean';
-  unit?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  default: number | boolean;
-  value: number | boolean;
-  source: 'panel' | 'default';
-};
+/**
+ * Trip Validation & Modes (console section 04): testing overrides, the validation thresholds,
+ * transit modes (min trip, max room, matching) and their room types — one page, one Save all.
+ */
+export default function TripValidationModesPage() {
+  const settings = useAdminQuery<SettingsResponse>('/settings/validation');
+  const catalog = useAdminQuery<CatalogResponse>('/settings/room-categories');
+  const overrides = useAdminQuery<OverridesResponse>('/settings/test-overrides');
 
-type SettingsResponse = { settings: Setting[] };
-
-/** Display order and one-line descriptions of the sections. */
-const GROUPS: { name: string; description: string }[] = [
-  { name: 'Speed', description: 'When a ride counts as moving or stopped.' },
-  { name: 'Timing', description: 'Grace period, post-ride extension and other timers.' },
-  { name: 'Score', description: 'The 0–100 score and how the three sensor modules are weighted.' },
-  { name: 'Rooms', description: 'Room behaviour tied to riders’ trips.' },
-  { name: 'Vibration', description: 'How phone vibration is read as a car (10–25 Hz band).' },
-  { name: 'Ground truth', description: 'The phone’s in-vehicle detection and the Google Roads check.' },
-  { name: 'Anti-spoofing', description: 'Fake GPS, teleporting and emulator protection.' },
-  { name: 'Advanced scoring', description: 'Fine tuning — change only with real-ride data.' },
-];
-
-/** Draft entry: text for numbers (so fields can be cleared while typing), boolean, or null = reset. */
-type Draft = Record<string, string | boolean | null>;
-
-export default function ValidationSettingsPage() {
-  const { data, error, loading, reload } = useAdminQuery<SettingsResponse>('/settings/validation');
-  const [draft, setDraft] = useState<Draft>({});
+  const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({});
+  const [catalogDraft, setCatalogDraft] = useState<CatalogDraft | null>(null);
+  const [overridesDraft, setOverridesDraft] = useState<OverridesDraft | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => setDraft({}), [data]);
+  // A fresh load replaces that part's draft.
+  useEffect(() => setSettingsDraft({}), [settings.data]);
+  useEffect(() => setCatalogDraft(catalog.data ? toDraft(catalog.data) : null), [catalog.data]);
+  useEffect(() => setOverridesDraft(overrides.data ? toOverridesDraft(overrides.data) : null), [overrides.data]);
 
-  const byGroup = useMemo(() => {
-    const map = new Map<string, Setting[]>();
-    for (const s of data?.settings ?? []) map.set(s.group, [...(map.get(s.group) ?? []), s]);
-    return GROUPS.filter((g) => map.has(g.name)).map((g) => ({ ...g, settings: map.get(g.name)! }));
-  }, [data]);
-
-  const changedCount = data?.settings.filter((s) => s.source === 'panel').length ?? 0;
-  const dirtyCount = Object.keys(draft).length;
-
-  const save = async () => {
-    const values: Record<string, number | boolean | null> = {};
-    for (const [key, raw] of Object.entries(draft)) {
-      const meta = data?.settings.find((s) => s.key === key);
-      if (raw === null || typeof raw === 'boolean') {
-        values[key] = raw;
-        continue;
-      }
-      const n = Number(raw);
-      if (raw.trim() === '' || !Number.isFinite(n)) {
-        toast.error(`${meta?.label ?? key}: enter a number.`);
-        return;
-      }
-      values[key] = n;
+  // Opened from the old Room Categories link: scroll to the room types once they load.
+  useEffect(() => {
+    if (catalogDraft && window.location.hash === '#room-types') {
+      document.getElementById('room-types')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  }, [catalogDraft != null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const settingsDirty = Object.keys(settingsDraft).length;
+  const catalogDirty = useMemo(
+    () =>
+      catalog.data != null &&
+      catalogDraft != null &&
+      JSON.stringify(toDraft(catalog.data)) !== JSON.stringify(catalogDraft),
+    [catalog.data, catalogDraft],
+  );
+  const overridesDirty = useMemo(
+    () =>
+      overrides.data != null &&
+      overridesDraft != null &&
+      JSON.stringify(toOverridesDraft(overrides.data)) !== JSON.stringify(overridesDraft),
+    [overrides.data, overridesDraft],
+  );
+  const dirtyParts = [
+    settingsDirty > 0 ? `${settingsDirty} setting${settingsDirty === 1 ? '' : 's'}` : null,
+    catalogDirty ? 'transit modes & room types' : null,
+    overridesDirty ? 'overrides' : null,
+  ].filter(Boolean) as string[];
+  const dirty = dirtyParts.length > 0;
+
+  const bandProblem = useMemo(() => {
+    const list = settings.data?.settings ?? [];
+    const val = (key: string) => {
+      const s = list.find((x) => x.key === key);
+      return s ? Number(shownValue(s, settingsDraft)) : null;
+    };
+    const floor = val('VALIDATION_VIBRATION_BAND_FLOOR');
+    const ceil = val('VALIDATION_VIBRATION_BAND_CEIL');
+    return floor != null && ceil != null && floor >= ceil ? 'The vibration floor must be below the ceiling.' : null;
+  }, [settings.data, settingsDraft]);
+
+  const discard = () => {
+    setSettingsDraft({});
+    if (catalog.data) setCatalogDraft(toDraft(catalog.data));
+    if (overrides.data) setOverridesDraft(toOverridesDraft(overrides.data));
+  };
+
+  const saveAll = async () => {
+    if (bandProblem) return void toast.error(bandProblem);
+    const settingsBody =
+      settingsDirty > 0 && settings.data ? settingsPayload(settingsDraft, settings.data.settings) : null;
+    if (settingsBody && 'error' in settingsBody) return void toast.error(settingsBody.error);
     setSaving(true);
+    const saved: string[] = [];
     try {
-      await adminApi('/settings/validation', { method: 'PUT', body: { values } });
-      toast.success('Saved. Rides use the new settings straight away.');
-      await reload();
+      if (settingsBody) {
+        await adminApi('/settings/validation', { method: 'PUT', body: settingsBody });
+        saved.push('validation settings');
+        await settings.reload();
+      }
+      if (catalogDirty && catalogDraft) {
+        await adminApi('/settings/room-categories', { method: 'PUT', body: catalogPayload(catalogDraft) });
+        saved.push('transit modes');
+        await catalog.reload();
+      }
+      if (overridesDirty && overridesDraft) {
+        await adminApi('/settings/test-overrides', { method: 'PUT', body: overridesDraft });
+        saved.push('overrides');
+        await overrides.reload();
+      }
+      toast.success('Saved. Rides and rooms use the new settings within a minute, with no app update.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save the settings.');
+      const message = err instanceof Error ? err.message : 'Could not save.';
+      toast.error(saved.length > 0 ? `Saved ${saved.join(' and ')}, but: ${message}` : message);
     } finally {
       setSaving(false);
     }
   };
 
+  const changedFromDefault = settings.data?.settings.filter((s) => s.source === 'panel').length ?? 0;
+  const globalOverrides = overrides.data
+    ? (['desktop', 'system'] as const).filter((k) => overrides.data![k].scope === 'all')
+    : [];
+  const overrideNames = useMemo(
+    () => Object.fromEntries((overrides.data?.riders ?? []).map((r) => [r.uid, r.displayName])),
+    [overrides.data],
+  );
+  const error = settings.error ?? catalog.error ?? overrides.error;
+
   return (
     <TooltipProvider>
-      <div className="space-y-6 max-w-5xl pb-20">
+      <div className="space-y-5 pb-10">
         <PageHeader
-          title="Trip Validation"
-          description="Every threshold the server uses to verify rides. Managed only here — not in .env. Changes apply within a minute, with no app update or restart."
-          actions={changedCount > 0 ? <StatusBadge tone="info">{changedCount} changed from default</StatusBadge> : undefined}
+          title="Trip Validation & Modes"
+          description="How the app decides a rider is really in transit, testing overrides, and how each transit mode matches riders into rooms. Changes apply within a minute, with no app update."
+          actions={
+            changedFromDefault > 0 ? (
+              <StatusBadge tone="info">{changedFromDefault} changed from default</StatusBadge>
+            ) : undefined
+          }
         />
-        {error ? <ErrorAlert message={error} onRetry={() => void reload()} /> : null}
-        {loading && !data ? Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-48 w-full" />) : null}
 
-        {byGroup.map((group) => (
-          <Card key={group.name}>
-            <CardHeader>
-              <CardTitle>{group.name}</CardTitle>
-              <CardDescription>{group.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y p-0">
-              {group.settings.map((s) => {
-                const edited = s.key in draft;
-                const raw = draft[s.key];
-                const shownNumber = edited ? (raw === null ? String(s.default) : String(raw)) : String(s.value);
-                const shownBool = edited ? (raw === null ? Boolean(s.default) : Boolean(raw)) : Boolean(s.value);
-                const id = `setting-${s.key}`;
-                return (
-                  <div key={s.key} className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Label htmlFor={id} className="text-sm font-medium">
-                          {s.label}
-                        </Label>
-                        {edited ? (
-                          <StatusBadge tone="warning">Unsaved</StatusBadge>
-                        ) : s.source === 'panel' ? (
-                          <StatusBadge tone="info">Changed</StatusBadge>
-                        ) : (
-                          <StatusBadge tone="outline">Default</StatusBadge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{s.help}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Default {String(s.default)}
-                        {s.unit ? ` ${s.unit}` : ''}
-                        {s.min != null && s.max != null ? ` · allowed ${s.min}–${s.max}` : ''} · <span className="font-mono">{s.key}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {s.kind === 'boolean' ? (
-                        <Switch id={id} checked={shownBool} onCheckedChange={(checked) => setDraft((d) => ({ ...d, [s.key]: checked }))} />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            id={id}
-                            type="number"
-                            inputMode="decimal"
-                            value={shownNumber}
-                            min={s.min}
-                            max={s.max}
-                            step={s.step}
-                            onChange={(e) => setDraft((d) => ({ ...d, [s.key]: e.target.value }))}
-                            className="w-28"
-                          />
-                          <span className="w-8 text-sm text-muted-foreground">{s.unit ?? ''}</span>
-                        </div>
-                      )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Reset ${s.label} to default`}
-                            disabled={s.source !== 'panel' && !edited}
-                            onClick={() =>
-                              setDraft((d) => {
-                                if (s.source === 'panel') return { ...d, [s.key]: null };
-                                const next = { ...d };
-                                delete next[s.key];
-                                return next;
-                              })
-                            }
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Reset to default</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        ))}
+        {/* Save bar, pinned under the top bar like the console. */}
+        <div className="sticky top-12 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card/95 px-3 py-2 backdrop-blur">
+          <div className="flex items-center gap-2 text-xs">
+            {dirty ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                Unsaved: {dirtyParts.join(', ')}
+              </>
+            ) : (
+              <span className="text-muted-foreground">All changes saved</span>
+            )}
+            {bandProblem ? <span className="text-primary">{bandProblem}</span> : null}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" disabled={!dirty || saving} onClick={discard}>
+              <RotateCcw className="h-3.5 w-3.5" /> Discard
+            </Button>
+            <Button size="sm" disabled={!dirty || saving || bandProblem != null} onClick={() => void saveAll()}>
+              <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save all'}
+            </Button>
+          </div>
+        </div>
 
-        {dirtyCount > 0 ? (
-          <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 lg:left-[calc(50%+116px)]">
-            <Card className="shadow-lg">
-              <CardContent className="flex items-center gap-4 py-3 px-4">
-                <span className="text-sm">
-                  {dirtyCount} unsaved change{dirtyCount === 1 ? '' : 's'}
-                </span>
-                <Button variant="outline" size="sm" disabled={saving} onClick={() => setDraft({})}>
-                  Discard
-                </Button>
-                <Button size="sm" disabled={saving} onClick={() => void save()}>
-                  <Save className="mr-1.5 h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}
-                </Button>
-              </CardContent>
-            </Card>
+        {error ? (
+          <ErrorAlert
+            message={error}
+            onRetry={() => void Promise.all([settings.reload(), catalog.reload(), overrides.reload()])}
+          />
+        ) : null}
+
+        {globalOverrides.length > 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-primary/40 bg-accent px-4 py-3 text-[13px] text-accent-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong>
+                {globalOverrides.map((k) => (k === 'desktop' ? 'Desktop' : 'System')).join(' and ')} override is on for
+                all riders.
+              </strong>{' '}
+              {globalOverrides.includes('desktop')
+                ? 'Anyone can join rooms without really riding.'
+                : 'Every trip ignores the phone’s in-vehicle reading.'}{' '}
+              Switch it to selected riders or off before launch.
+            </span>
           </div>
         ) : null}
+
+        <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <Panel
+            eyebrow="Testing"
+            title="Access and overrides"
+            description="Let testers use the app without a real ride"
+            action={
+              overridesDraft && (overridesDraft.desktop.scope !== 'off' || overridesDraft.system.scope !== 'off') ? (
+                <StatusBadge tone="warning">On</StatusBadge>
+              ) : (
+                <StatusBadge tone="secondary">Off</StatusBadge>
+              )
+            }
+          >
+            {overridesDraft ? (
+              <OverridesPanel draft={overridesDraft} setDraft={setOverridesDraft} initialNames={overrideNames} />
+            ) : (
+              <Skeleton className="h-48 w-full" />
+            )}
+          </Panel>
+
+          <Panel
+            eyebrow="Trip validation engine"
+            title="Calibration"
+            description="The main thresholds. Every setting is under Advanced calibration below."
+          >
+            {settings.data ? (
+              <CalibrationPanel settings={settings.data.settings} draft={settingsDraft} setDraft={setSettingsDraft} />
+            ) : (
+              <Skeleton className="h-64 w-full" />
+            )}
+          </Panel>
+        </div>
+
+        <Panel
+          eyebrow="Context-aware parameters"
+          title="Transit modes"
+          description="Each room group is a transit mode. Min trip and Max room are in minutes; 0 means off."
+          bodyClassName="p-0"
+        >
+          {catalogDraft ? (
+            <ModesTable draft={catalogDraft} setDraft={setCatalogDraft} />
+          ) : (
+            <Skeleton className="m-4 h-40" />
+          )}
+        </Panel>
+
+        <section id="room-types" className="scroll-mt-28">
+          <Panel
+            eyebrow="Transit modes"
+            title="Room types"
+            description="The groups and room types riders pick from. Click a row to edit it."
+          >
+            {catalogDraft && catalog.data ? (
+              <RoomTypesEditor data={catalog.data} draft={catalogDraft} setDraft={setCatalogDraft} />
+            ) : (
+              <Skeleton className="h-64 w-full" />
+            )}
+          </Panel>
+        </section>
+
+        <Panel
+          eyebrow="Trip validation engine"
+          title="Advanced calibration"
+          description="Every threshold the server uses, by section. Managed only here, never in .env."
+          bodyClassName="p-0"
+        >
+          {settings.data ? (
+            <AdvancedCalibration settings={settings.data.settings} draft={settingsDraft} setDraft={setSettingsDraft} />
+          ) : (
+            <Skeleton className="m-4 h-40" />
+          )}
+        </Panel>
       </div>
     </TooltipProvider>
   );

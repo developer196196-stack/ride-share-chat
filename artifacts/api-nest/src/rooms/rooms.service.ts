@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -28,9 +29,11 @@ import { ServerEvents } from '../realtime/realtime.events';
 import { RealtimeService } from '../realtime/realtime.service';
 import { getRoomSkipBlockSec, MPS_TO_MPH } from '../validation/validation.config';
 import { ValidationService } from '../validation/validation.service';
+import { TestOverridesService } from '../validation/test-overrides.service';
 import type { TerminationReason } from '../validation/validation.types';
 import { LiveKitService } from './livekit.service';
 import { RoomCategoriesService } from './room-categories.service';
+import { minTripRemainingMs, placeMatches, roomClosesAt, ROOM_ENDING_NOTICE_MS, type Place } from './mode-rules';
 import {
   DISCOVER_LIMIT,
   ROOM_CAPACITY,
@@ -76,7 +79,39 @@ function conflict(code: string, message: string): never {
   throw new ConflictException(body);
 }
 
-type RoomMeta = { vibe?: string; hostUid?: string; matching?: string; locked?: string; createdAt?: string };
+type RoomMeta = {
+  vibe?: string;
+  hostUid?: string;
+  matching?: string;
+  locked?: string;
+  createdAt?: string;
+  /** Where the room opened (local / nationwide matching). */
+  lat?: string;
+  lng?: string;
+  country?: string;
+  /** Set once the "closes in 2 minutes" notice went out. */
+  endingNotice?: string;
+};
+
+/** How often the time-limit check runs. */
+const EXPIRY_CHECK_MS = 15_000;
+
+const roomPlace = (meta: RoomMeta): Place => ({
+  lat: meta.lat != null && meta.lat !== '' ? Number(meta.lat) : null,
+  lng: meta.lng != null && meta.lng !== '' ? Number(meta.lng) : null,
+  country: meta.country || null,
+});
+
+/** Room fields recording where it opened. */
+function placeFields(place: Place): Record<string, string> {
+  const fields: Record<string, string> = {};
+  if (place.lat != null && place.lng != null) {
+    fields.lat = String(place.lat);
+    fields.lng = String(place.lng);
+  }
+  if (place.country) fields.country = place.country;
+  return fields;
+}
 
 /** Public = on the Discovery Grid and open to matchmaking. */
 const isPublic = (meta: RoomMeta) => meta.matching !== 'manual' && meta.locked !== '1';
@@ -120,8 +155,9 @@ const ROOM_ID = /^ROOM-[0-9A-F]{4}-[0-9A-F]{2}$/;
  * browse live rooms (Discovery Grid) and join a specific one.
  */
 @Injectable()
-export class RoomsService implements OnModuleInit {
+export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RoomsService.name);
+  private expiryTimer: NodeJS.Timeout | null = null;
 
   constructor(
     @Inject(REDIS) private readonly redisClient: Redis | null,
@@ -132,10 +168,82 @@ export class RoomsService implements OnModuleInit {
     private readonly realtime: RealtimeService,
     private readonly categories: RoomCategoriesService,
     private readonly push: PushService,
+    private readonly overrides: TestOverridesService,
   ) {}
 
   onModuleInit(): void {
     this.validation.onTerminated((uid, reason) => this.handleTermination(uid, reason));
+    if (this.redisClient) {
+      this.expiryTimer = setInterval(() => void this.closeExpiredRooms(), EXPIRY_CHECK_MS);
+      this.expiryTimer.unref();
+    }
+  }
+
+  onModuleDestroy(): void {
+    if (this.expiryTimer) clearInterval(this.expiryTimer);
+  }
+
+  // ---------------------------------------------------------------- transit mode rules
+
+  /** Where a rider is: last GPS position and the country of their phone number. */
+  private async placeOf(uid: string): Promise<Place> {
+    const [loc, profile] = await Promise.all([
+      this.validation.getLatestLocation(uid).catch(() => null),
+      this.profiles.get(uid),
+    ]);
+    return { lat: loc?.lat ?? null, lng: loc?.lng ?? null, country: profile.countryCode };
+  }
+
+  /** Min trip: verified riding time before joining this mode's rooms (desktop testers skip it). */
+  private async requireMinTrip(uid: string, vibe: Vibe): Promise<void> {
+    const mode = this.categories.modeOf(vibe);
+    if (!mode || mode.minTripMinutes <= 0 || this.overrides.forRider(uid).desktop) return;
+    const state = await this.validation.getState(uid);
+    const left = minTripRemainingMs(mode, state.verifiedAt, Date.now());
+    if (left > 0) {
+      const minutes = Math.ceil(left / 60_000);
+      conflict(
+        'TRIP_TOO_SHORT',
+        `${mode.label} rooms open after ${mode.minTripMinutes} minutes of riding. About ${minutes} minute${minutes === 1 ? '' : 's'} to go.`,
+      );
+    }
+  }
+
+  /** Max room: warn riders 2 minutes before a room's time limit, then close it. One instance at a time. */
+  private async closeExpiredRooms(): Promise<void> {
+    const redis = this.redisClient;
+    if (!redis) return;
+    try {
+      if (!(await redis.set('lock:rooms:expiry', '1', 'PX', EXPIRY_CHECK_MS - 1_000, 'NX'))) return;
+      const now = Date.now();
+      for (const vibe of this.categories.allIds()) {
+        const mode = this.categories.modeOf(vibe);
+        if (!mode || mode.maxRoomMinutes <= 0) continue;
+        for (const roomId of await redis.smembers(keys.all(vibe))) {
+          const meta = (await redis.hgetall(keys.room(roomId))) as RoomMeta;
+          const closesAt = roomClosesAt(mode, Number(meta.createdAt ?? 0));
+          if (closesAt == null) continue;
+          const members = await this.roomMembers(roomId);
+          if (members.length === 0) continue;
+          if (now >= closesAt) {
+            await this.adminCloseRoom(
+              roomId,
+              `This R.O.O.M. reached its ${mode.maxRoomMinutes}-minute limit and closed. Join another one to keep talking.`,
+            );
+            this.logger.log(`Room ${roomId} closed at its ${mode.maxRoomMinutes}-minute limit`);
+          } else if (now >= closesAt - ROOM_ENDING_NOTICE_MS && meta.endingNotice !== '1') {
+            await redis.hset(keys.room(roomId), 'endingNotice', '1');
+            const minutes = Math.max(1, Math.round((closesAt - now) / 60_000));
+            this.realtime.emitToUsers(members, ServerEvents.ROOM_NOTICE, {
+              roomId,
+              message: `This R.O.O.M. closes in ${minutes} minute${minutes === 1 ? '' : 's'} (${mode.maxRoomMinutes}-minute limit).`,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Room time-limit check failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private get redis(): Redis {
@@ -189,7 +297,19 @@ export class RoomsService implements OnModuleInit {
 
   /** Discovery Grid: live rooms with open seats, fullest first (newest breaks ties). */
   async discover(uid: string): Promise<{ rooms: DiscoverRoomDto[]; liveRooms: number }> {
-    const current = await this.currentRoomId(uid);
+    const [current, place, state] = await Promise.all([
+      this.currentRoomId(uid),
+      this.placeOf(uid),
+      this.validation.getState(uid),
+    ]);
+    const desktop = this.overrides.forRider(uid).desktop;
+    const now = Date.now();
+    // Transit mode rules: matching scope, and min trip (rooms the rider can't join yet are hidden).
+    const fits = (vibe: Vibe, meta: RoomMeta) => {
+      const mode = this.categories.modeOf(vibe);
+      if (!desktop && minTripRemainingMs(mode, state.verifiedAt, now) > 0) return false;
+      return placeMatches(mode, roomPlace(meta), place);
+    };
     const perVibe = await Promise.all(
       this.categories.allIds().map(async (vibe) => (await this.redis.smembers(keys.all(vibe))).map((roomId) => ({ roomId, vibe }))),
     );
@@ -207,7 +327,7 @@ export class RoomsService implements OnModuleInit {
           members,
           hostUid: meta.hostUid ?? null,
           createdAt: Number(meta.createdAt ?? 0),
-          listed: isPublic(meta) && ejected === 0,
+          listed: isPublic(meta) && ejected === 0 && fits(vibe, meta),
         };
       }),
     );
@@ -256,8 +376,8 @@ export class RoomsService implements OnModuleInit {
   }
 
   private async buildSession(uid: string, roomId: string): Promise<RoomSessionDto | null> {
-    const [[vibe, hostUid, matching, locked], memberIds, session] = await Promise.all([
-      this.redis.hmget(keys.room(roomId), 'vibe', 'hostUid', 'matching', 'locked'),
+    const [[vibe, hostUid, matching, locked, createdAt], memberIds, session] = await Promise.all([
+      this.redis.hmget(keys.room(roomId), 'vibe', 'hostUid', 'matching', 'locked', 'createdAt'),
       this.roomMembers(roomId),
       this.getRideSession(uid),
     ]);
@@ -288,7 +408,15 @@ export class RoomsService implements OnModuleInit {
       members,
       livekit: await this.livekit.connectionFor(roomId, uid, self?.displayName ?? 'Rider'),
       joinedAt: new Date(session?.currentJoinedAt ?? Date.now()).toISOString(),
+      ...this.roomTimes(vibe, Number(createdAt ?? 0)),
     };
+  }
+
+  /** Opening time and the mode's closing time (for the room's countdown bar). */
+  private roomTimes(vibe: string | null | undefined, createdAt: number): { openedAt: string; closesAt: string | null } {
+    const opened = createdAt || Date.now();
+    const closes = roomClosesAt(this.categories.modeOf(vibe), opened);
+    return { openedAt: new Date(opened).toISOString(), closesAt: closes != null ? new Date(closes).toISOString() : null };
   }
 
   // ---------------------------------------------------------------- join / leave
@@ -305,12 +433,14 @@ export class RoomsService implements OnModuleInit {
   async host(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
     this.categories.requireActive(vibe);
     await this.requireVerified(uid);
+    await this.requireMinTrip(uid, vibe);
+    const place = await this.placeOf(uid);
     await this.leaveRoom(uid);
     const roomId = await this.withVibeLock(vibe, async () => {
       const id = newRoomId();
       await this.redis
         .multi()
-        .hset(keys.room(id), { vibe, createdAt: String(Date.now()), hostUid: uid })
+        .hset(keys.room(id), { vibe, createdAt: String(Date.now()), hostUid: uid, ...placeFields(place) })
         .sadd(keys.all(vibe), id)
         .exec();
       await this.seat(uid, id, vibe);
@@ -368,6 +498,8 @@ export class RoomsService implements OnModuleInit {
     }
     // A host invite gets past Manual matching and the Privacy Lock (never past an ejection or skip).
     const invited = (await this.redis.exists(keys.invite(roomId, uid))) === 1;
+    // A host's invite gets past the transit mode's min trip, like it gets past the Privacy Lock.
+    if (!invited) await this.requireMinTrip(uid, vibe);
     // Check before leaving the current room, so a rejected join keeps the rider where they are.
     await this.assertJoinable(uid, roomId, invited);
     await this.leaveRoom(uid);
@@ -398,6 +530,7 @@ export class RoomsService implements OnModuleInit {
   async join(uid: string, vibe: Vibe): Promise<RoomSessionDto> {
     this.categories.requireActive(vibe);
     await this.requireVerified(uid);
+    await this.requireMinTrip(uid, vibe);
     const current = await this.currentRoomId(uid);
     if (current) {
       const currentVibe = this.categories.resolve(await this.redis.hget(keys.room(current), 'vibe'));
@@ -434,6 +567,8 @@ export class RoomsService implements OnModuleInit {
   }
 
   private async assign(uid: string, vibe: Vibe, excludeRoomId: string | null): Promise<RoomSessionDto> {
+    const mode = this.categories.modeOf(vibe);
+    const place = await this.placeOf(uid);
     const roomId = await this.withVibeLock(vibe, async () => {
       // Open rooms, fullest first.
       const candidates = await this.redis.zrevrangebyscore(keys.open(vibe), ROOM_CAPACITY - 1, 1);
@@ -444,6 +579,7 @@ export class RoomsService implements OnModuleInit {
         if (members.length === 0 || members.length >= ROOM_CAPACITY) continue;
         if (await this.blockedFrom(uid, members)) continue;
         if ((await this.redis.sismember(keys.ejected(candidate), uid)) === 1) continue;
+        if (!placeMatches(mode, roomPlace((await this.redis.hgetall(keys.room(candidate))) as RoomMeta), place)) continue;
         chosen = candidate;
         break;
       }
@@ -453,7 +589,7 @@ export class RoomsService implements OnModuleInit {
         chosen = newRoomId();
         await this.redis
           .multi()
-          .hset(keys.room(chosen), { vibe, createdAt: String(Date.now()), hostUid: uid })
+          .hset(keys.room(chosen), { vibe, createdAt: String(Date.now()), hostUid: uid, ...placeFields(place) })
           .sadd(keys.all(vibe), chosen)
           .exec();
       }
@@ -650,6 +786,8 @@ export class RoomsService implements OnModuleInit {
       vibe: session.vibe,
       matching: session.matching,
       locked: session.locked,
+      openedAt: session.openedAt,
+      closesAt: session.closesAt,
     });
     return session;
   }
@@ -665,6 +803,8 @@ export class RoomsService implements OnModuleInit {
       matching: RoomMatching;
       locked: boolean;
       createdAt: string;
+      /** When the transit mode's time limit closes the room (null = no limit). */
+      closesAt: string | null;
       members: { uid: string; displayName: string; photoUrl: string | null; isHost: boolean }[];
     }[]
   > {
@@ -688,6 +828,10 @@ export class RoomsService implements OnModuleInit {
         matching: (meta.matching === 'manual' ? 'manual' : 'auto') as RoomMatching,
         locked: meta.locked === '1',
         createdAt: new Date(Number(meta.createdAt ?? Date.now())).toISOString(),
+        closesAt: (() => {
+          const at = roomClosesAt(this.categories.modeOf(meta.vibe), Number(meta.createdAt ?? 0));
+          return at != null ? new Date(at).toISOString() : null;
+        })(),
         members: members.map((uid) => ({
           uid,
           displayName: profiles.get(uid)?.displayName ?? 'Rider',

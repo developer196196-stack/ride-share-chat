@@ -366,7 +366,9 @@ export const GetCurrentRoomResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 }),zod.null()])
 })
 
@@ -406,7 +408,9 @@ export const JoinRoomResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 })
 
 
@@ -473,7 +477,9 @@ export const HostRoomResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 })
 
 
@@ -507,7 +513,9 @@ export const JoinRoomByIdResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 })
 
 
@@ -538,7 +546,9 @@ export const NextRoomResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 })
 
 
@@ -601,7 +611,9 @@ export const UpdateRoomSettingsResponse = zod.object({
   "url": zod.string(),
   "token": zod.string()
 }),zod.null()]).describe('Null when video is not configured on the server'),
-  "joinedAt": zod.coerce.date()
+  "joinedAt": zod.coerce.date(),
+  "openedAt": zod.coerce.date().optional().describe('When the room opened'),
+  "closesAt": zod.coerce.date().nullish().describe('When the transit mode\'s time limit (Max room) closes the room; null = no limit')
 })
 
 

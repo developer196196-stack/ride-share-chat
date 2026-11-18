@@ -43,6 +43,9 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 const ID = /^[a-z][a-z0-9_]{1,39}$/;
 
+export const MATCHING_SCOPES = ['global', 'nationwide', 'local'] as const;
+export type MatchingScope = (typeof MATCHING_SCOPES)[number];
+
 const GroupSchema = z.object({
   id: z.string().regex(ID, 'Group ids use lowercase letters, numbers and _ (2–40 characters).'),
   label: z.string().trim().min(1).max(40),
@@ -50,6 +53,15 @@ const GroupSchema = z.object({
   icon: z.string().refine((v) => v in CATEGORY_ICONS, 'Unknown icon.'),
   color: z.string().refine((v) => v in CATEGORY_COLORS, 'Pick a colour from the palette.'),
   active: z.boolean(),
+  // Transit mode settings (Trip Validation & Modes). The defaults keep the original behaviour.
+  /** Minutes of verified riding before a rider can join this mode's rooms (0 = straight away). */
+  minTripMinutes: z.number().int().min(0).max(240).default(0),
+  /** A room closes this many minutes after it opened (0 = no limit). */
+  maxRoomMinutes: z.number().int().min(0).max(1440).default(0),
+  /** Who is matched together: anyone (global), same country (nationwide) or nearby (local). */
+  matching: z.enum(MATCHING_SCOPES).default('global'),
+  /** Local matching distance from the room's starting point. */
+  localRadiusMiles: z.number().min(1).max(500).default(15),
 });
 
 const TypeSchema = z.object({
@@ -79,6 +91,10 @@ const group = (id: string, label: string, description: string, icon: string, col
   icon,
   color,
   active: true,
+  minTripMinutes: 0,
+  maxRoomMinutes: 0,
+  matching: 'global',
+  localRadiusMiles: 15,
 });
 
 const type = (

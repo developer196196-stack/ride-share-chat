@@ -28,6 +28,8 @@ export const ServerEvents = {
   ROOM_SETTINGS_CHANGED: 'ROOM_SETTINGS_CHANGED',
   ROOM_EJECTED: 'ROOM_EJECTED',
   FORCE_MUTED: 'FORCE_MUTED',
+  /** To a room's riders: a notice such as "This R.O.O.M. closes in 2 minutes" ({ roomId, message }). */
+  ROOM_NOTICE: 'ROOM_NOTICE',
   ROOM_INVITE: 'ROOM_INVITE',
   ROOM_JOIN_REQUEST: 'ROOM_JOIN_REQUEST',
   ROOM_REQUEST_DECLINED: 'ROOM_REQUEST_DECLINED',
@@ -41,7 +43,15 @@ export type StateChangedPayload = ValidationSnapshot & { previousState: Validati
 export type MemberJoinedPayload = { roomId: string; member: RoomMember };
 export type MemberLeftPayload = { roomId: string; uid: string };
 export type HostChangedPayload = { roomId: string; hostUid: string };
-export type RoomSettingsPayload = { roomId: string; vibe: Vibe; matching: RoomMatching; locked: boolean };
+export type RoomSettingsPayload = {
+  roomId: string;
+  vibe: Vibe;
+  matching: RoomMatching;
+  locked: boolean;
+  /** Room times (a room type change can change the time limit). */
+  openedAt?: string;
+  closesAt?: string | null;
+};
 export type ModerationNoticePayload = { roomId: string; message: string };
 export type RoomInvitePayload = { roomId: string; vibe: Vibe; from: RoomHost; viaRequest: boolean; expiresAt: string };
 export type JoinRequestPayload = { roomId: string; requester: RoomHost };

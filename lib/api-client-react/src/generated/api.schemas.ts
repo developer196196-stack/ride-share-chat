@@ -385,6 +385,13 @@ export interface RoomSession {
   /** Null when video is not configured on the server */
   livekit: LiveKitConnection | null;
   joinedAt: string;
+  /** When the room opened */
+  openedAt?: string;
+  /**
+     * When the transit mode's time limit (Max room) closes the room; null = no limit
+     * @nullable
+     */
+  closesAt?: string | null;
 }
 
 export interface RoomSettingsUpdate {
