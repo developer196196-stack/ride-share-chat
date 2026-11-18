@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -15,7 +16,9 @@ import {
   FOLLOWERS_SUBCOLLECTION,
   FOLLOWING_SUBCOLLECTION,
   getAuth,
+  getStorageBucket,
   RIDES_SUBCOLLECTION,
+  userAvatarStoragePrefix,
   type ReportDoc,
   type RideDoc,
   type SafetyAlertDoc,
@@ -23,6 +26,9 @@ import {
 } from '@workspace/firebase';
 import type { ErrorResponseBody } from '../common/error-response';
 import { requireFirestore } from '../common/require-firestore';
+import { validationError } from '../common/zod-parse';
+import { DEVICE_BLOCKED_MESSAGE, DevicesService } from '../devices/devices.service';
+import type { CreateRiderInput } from './admin.controller';
 import { SUSPENDED_MESSAGE, SUSPENDED_SET } from '../common/suspension';
 import { FIRESTORE } from '../firebase/firebase.tokens';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -47,7 +53,16 @@ function notFound(message: string): never {
   throw new NotFoundException(body);
 }
 
-type LiveState = { validationState: string | null; roomId: string | null };
+function riderExists(uid: string): never {
+  const body: ErrorResponseBody = {
+    code: 'RIDER_EXISTS',
+    message: 'A rider with this phone number already exists.',
+    details: { uid },
+  };
+  throw new ConflictException(body);
+}
+
+type LiveState ={ validationState: string | null; roomId: string | null };
 
 /** Admin panel: riders, reports, live rooms, safety alerts and Trip Validation settings. */
 @Injectable()
@@ -63,6 +78,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     private readonly validation: ValidationService,
     private readonly realtime: RealtimeService,
     private readonly categories: RoomCategoriesService,
+    private readonly devices: DevicesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -192,6 +208,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       phoneNumber: data.phoneNumber,
       homeCity: data.homeCity,
       rideStyle: data.rideStyle,
+      incognitoDropoff: data.incognitoDropoff ?? true,
       profileComplete: data.profileCompletedAt != null,
       suspended: data.suspended === true,
       createdAt: iso(data.createdAt),
@@ -205,7 +222,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (!doc.exists) notFound('That rider does not exist.');
     const data = doc.data() as UserDoc;
     const reports = this.db.collection(FirestoreCollections.reports);
-    const [profile, ridesSnap, against, by, followers, following, snapshot, liveRooms, authUser] = await Promise.all([
+    const [profile, ridesSnap, against, by, followers, following, snapshot, liveRooms, authUser, devices] = await Promise.all([
       this.profiles.getMany([uid]).then((m) => m.get(uid)),
       this.users().doc(uid).collection(RIDES_SUBCOLLECTION).orderBy('endedAt', 'desc').limit(20).get(),
       reports.where('reportedUid', '==', uid).limit(50).get(),
@@ -215,6 +232,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       this.redis ? this.validation.getSnapshot(uid).catch(() => null) : Promise.resolve(null),
       this.redis ? this.rooms.liveRooms([uid]) : Promise.resolve(new Map()),
       getAuth().getUser(uid).catch(() => null),
+      this.devices.listForUser(uid).catch(() => []),
     ]);
     const toReport = (d: QueryDocumentSnapshot) => {
       const r = d.data() as ReportDoc;
@@ -258,7 +276,203 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       }),
       reportsAgainst: against.docs.map(toReport).sort(byDate),
       reportsBy: by.docs.map(toReport).sort(byDate),
+      devices,
     };
+  }
+
+  /**
+   * Adds a rider from the panel: a Firebase phone account plus a finished `users/{uid}` profile.
+   * When that person signs in on the app with the same number (SMS code), Firebase gives them this
+   * account, so they skip Profile Setup. A phone that already has a Firebase account but never
+   * finished signing up gets the profile on that account instead.
+   */
+  async createUser(input: CreateRiderInput, adminEmail: string | null) {
+    const taken = await this.users().where('phoneNumber', '==', input.phoneNumber).limit(1).get();
+    if (!taken.empty) riderExists(taken.docs[0]!.id);
+
+    const auth = getAuth();
+    let uid: string;
+    let createdAuthUser = false;
+    const existing = await auth.getUserByPhoneNumber(input.phoneNumber).catch(() => null);
+    if (existing) {
+      if ((await this.users().doc(existing.uid).get()).exists) riderExists(existing.uid);
+      uid = existing.uid;
+    } else {
+      try {
+        uid = (await auth.createUser({ phoneNumber: input.phoneNumber, displayName: input.displayName })).uid;
+        createdAuthUser = true;
+      } catch (error) {
+        const code = (error as { code?: string }).code ?? '';
+        if (code === 'auth/invalid-phone-number') {
+          validationError('That phone number is not valid.', { field: 'phoneNumber' });
+        }
+        throw error;
+      }
+    }
+
+    const now = Timestamp.now();
+    const doc: UserDoc = {
+      uid,
+      phoneNumber: input.phoneNumber,
+      countryCode: null,
+      displayName: input.displayName,
+      displayNameLower: input.displayName.toLowerCase(),
+      homeCity: input.homeCity,
+      rideStyle: input.rideStyle,
+      incognitoDropoff: input.incognitoDropoff,
+      photoStoragePath: null,
+      profileCompletedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      await this.users().doc(uid).create(doc);
+    } catch (error) {
+      // Don't leave a Firebase account behind without its rider profile.
+      if (createdAuthUser) await auth.deleteUser(uid).catch(() => undefined);
+      throw error;
+    }
+    this.logger.log(`Rider ${uid} added by ${adminEmail ?? 'admin'}`);
+    return { uid };
+  }
+
+  /** Edit a rider's profile. A new phone number moves their sign-in to that number. */
+  async updateUser(uid: string, input: CreateRiderInput, adminEmail: string | null) {
+    const ref = this.users().doc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) notFound('That rider does not exist.');
+    const current = snap.data() as UserDoc;
+
+    if (input.phoneNumber !== current.phoneNumber) {
+      const taken = await this.users().where('phoneNumber', '==', input.phoneNumber).limit(2).get();
+      if (taken.docs.some((d) => d.id !== uid)) riderExists(taken.docs.find((d) => d.id !== uid)!.id);
+      try {
+        await getAuth().updateUser(uid, { phoneNumber: input.phoneNumber });
+      } catch (error) {
+        const code = (error as { code?: string }).code ?? '';
+        if (code === 'auth/phone-number-already-exists') riderExists(uid);
+        if (code === 'auth/invalid-phone-number') validationError('That phone number is not valid.', { field: 'phoneNumber' });
+        if (code !== 'auth/user-not-found') throw error;
+      }
+    }
+
+    const now = Timestamp.now();
+    await ref.update({
+      phoneNumber: input.phoneNumber,
+      displayName: input.displayName,
+      displayNameLower: input.displayName.toLowerCase(),
+      homeCity: input.homeCity,
+      rideStyle: input.rideStyle,
+      incognitoDropoff: input.incognitoDropoff,
+      ...(current.profileCompletedAt ? {} : { profileCompletedAt: now }),
+      updatedAt: now,
+    });
+    this.profiles.invalidate(uid);
+    this.logger.log(`Rider ${uid} profile edited by ${adminEmail ?? 'admin'}`);
+    return { ok: true };
+  }
+
+  /** "Kill session": the ride ends and they leave any room. They can start a new ride straight away. */
+  async endRide(uid: string, adminEmail: string | null) {
+    if (!(await this.users().doc(uid).get()).exists) notFound('That rider does not exist.');
+    if (this.redis) await this.rooms.adminEndForSuspension(uid);
+    this.realtime.emitToUser(uid, ServerEvents.SESSION_TERMINATED, {
+      reason: 'admin_ended',
+      message: 'Your ride was ended by RideShare Chats support.',
+    });
+    this.logger.log(`Rider ${uid} ride ended by ${adminEmail ?? 'admin'}`);
+    return { ok: true };
+  }
+
+  /**
+   * Deletes the account: Firebase sign-in, `users/{uid}` with its rides, contacts and follows (both
+   * sides), devices, share links and avatar files. Reports and safety alerts stay for the record.
+   */
+  async deleteUser(uid: string, adminEmail: string | null) {
+    const ref = this.users().doc(uid);
+    if (!(await ref.get()).exists) notFound('That rider does not exist.');
+
+    // Live state first, so nothing is recreated while we delete.
+    this.realtime.emitToUser(uid, ServerEvents.SESSION_TERMINATED, {
+      reason: 'account_deleted',
+      message: 'This account has been deleted.',
+    });
+    this.realtime.disconnectUser(uid);
+    if (this.redis) {
+      await this.rooms.adminEndForSuspension(uid);
+      await this.redis.multi().srem(SUSPENDED_SET, uid).del(`prefs:${uid}`, `share:active:${uid}`).exec();
+    }
+
+    const db = this.db;
+    // The other side of each follow lives under the other rider.
+    const [following, followers, tokens, links] = await Promise.all([
+      ref.collection(FOLLOWING_SUBCOLLECTION).select().get(),
+      ref.collection(FOLLOWERS_SUBCOLLECTION).select().get(),
+      db.collection(FirestoreCollections.pushTokens).where('uid', '==', uid).select().get(),
+      db.collection(FirestoreCollections.shareLinks).where('uid', '==', uid).select().get(),
+    ]);
+    const writer = db.bulkWriter();
+    for (const d of following.docs) writer.delete(this.users().doc(d.id).collection(FOLLOWERS_SUBCOLLECTION).doc(uid));
+    for (const d of followers.docs) writer.delete(this.users().doc(d.id).collection(FOLLOWING_SUBCOLLECTION).doc(uid));
+    for (const d of [...tokens.docs, ...links.docs]) writer.delete(d.ref);
+    await writer.close();
+    await db.recursiveDelete(ref);
+    // A block on their phone stays; only the link to this account goes.
+    await this.devices.forgetUser(uid).catch((e: unknown) => this.logger.warn(`Forget devices of ${uid}: ${String(e)}`));
+
+    await getStorageBucket()
+      ?.deleteFiles({ prefix: userAvatarStoragePrefix(uid) })
+      .catch((e: unknown) => this.logger.warn(`Delete avatar files of ${uid}: ${String(e)}`));
+    await getAuth()
+      .deleteUser(uid)
+      .catch((e: unknown) => {
+        if ((e as { code?: string }).code !== 'auth/user-not-found') throw e;
+      });
+    this.profiles.invalidate(uid);
+    this.logger.log(`Rider ${uid} deleted by ${adminEmail ?? 'admin'}`);
+    return { ok: true };
+  }
+
+  // ---------------------------------------------------------------- devices
+
+  /** Block or unblock one phone. Whoever is using it is signed out and their ride ends. */
+  async setDeviceBlocked(key: string, blocked: boolean, reason: string | null, adminEmail: string | null) {
+    const uids = await this.devices.setBlocked(key, blocked, adminEmail, reason);
+    if (blocked) await Promise.all(uids.map((uid) => this.kickForBlockedDevice(uid)));
+    return { ok: true };
+  }
+
+  /**
+   * Every blocked phone, including ones whose riders were deleted (they appear under no rider any
+   * more, so this is where they can be unblocked).
+   */
+  async listBlockedDevices() {
+    const devices = await this.devices.listBlocked();
+    const uids = [...new Set(devices.flatMap((d) => d.uids))];
+    const snaps = uids.length > 0 ? await this.db.getAll(...uids.map((u) => this.users().doc(u))) : [];
+    const names = new Map(snaps.filter((s) => s.exists).map((s) => [s.id, (s.data() as UserDoc).displayName]));
+    return devices.map(({ uids: deviceUids, ...d }) => ({
+      ...d,
+      riders: deviceUids.filter((u) => names.has(u)).map((uid) => ({ uid, displayName: names.get(uid) ?? null })),
+    }));
+  }
+
+  /** "Block device" on a rider: every phone they have used. */
+  async blockRiderDevices(uid: string, reason: string | null, adminEmail: string | null) {
+    if (!(await this.users().doc(uid).get()).exists) notFound('That rider does not exist.');
+    const devices = (await this.devices.listForUser(uid)).filter((d) => !d.blocked);
+    const affected = new Set<string>([uid]);
+    for (const d of devices) {
+      for (const u of await this.devices.setBlocked(d.key, true, adminEmail, reason)) affected.add(u);
+    }
+    if (devices.length > 0) await Promise.all([...affected].map((u) => this.kickForBlockedDevice(u)));
+    return { blocked: devices.length };
+  }
+
+  private async kickForBlockedDevice(uid: string): Promise<void> {
+    if (this.redis) await this.rooms.adminEndForSuspension(uid).catch(() => undefined);
+    this.realtime.emitToUser(uid, ServerEvents.SESSION_TERMINATED, { reason: 'device_blocked', message: DEVICE_BLOCKED_MESSAGE });
+    this.realtime.disconnectUser(uid);
   }
 
   /** Suspend: API and sockets refuse the account, Firebase sign-in is disabled, the ride ends. */

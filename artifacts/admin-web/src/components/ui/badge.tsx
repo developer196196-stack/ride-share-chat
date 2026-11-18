@@ -3,27 +3,19 @@ import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const badgeVariants = cva(
-  // @replit
-  // Whitespace-nowrap: Badges should never wrap.
-  'whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2' +
-    ' hover-elevate ',
+  // Console "pill": small mono uppercase tag. Never wraps.
+  'whitespace-nowrap inline-flex items-center gap-1 rounded border px-1.5 py-[2px] font-mono text-[10.5px] font-medium uppercase tracking-wider transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
   {
     variants: {
       variant: {
-        default:
-          // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
-          'border-transparent bg-primary text-primary-foreground shadow-xs',
-        secondary:
-          // @replit no hover because we use hover-elevate
-          'border-transparent bg-secondary text-secondary-foreground',
-        destructive:
-          // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
-          'border-transparent bg-destructive text-destructive-foreground shadow-xs',
-        // @replit shadow-xs" - use badge outline variable
-        outline: 'text-foreground border border-border',
-        success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-        warning: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
-        info: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400',
+        default: 'border-primary/20 bg-accent text-accent-foreground',
+        secondary: 'border-border bg-secondary text-muted-foreground',
+        destructive: 'border-primary/20 bg-accent text-accent-foreground',
+        outline: 'border-border text-foreground',
+        success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
+        warning: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+        info: 'border-sky-500/30 bg-sky-500/10 text-sky-700',
+        navy: 'border-foreground bg-foreground text-background',
       },
     },
     defaultVariants: {

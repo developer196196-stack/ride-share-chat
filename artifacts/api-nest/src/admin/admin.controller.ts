@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import type { DecodedIdToken } from '@workspace/firebase';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
@@ -12,7 +12,17 @@ type AdminRequest = { user?: DecodedIdToken };
 
 const SuspendBody = z.object({ reason: z.string().max(500).nullish() });
 const ReviewBody = z.object({ note: z.string().max(1000).nullish() });
-const SettingsBody = z.object({ values: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])) });
+/** Add / edit a rider. Same rules as the app's Profile Setup (UpdateRiderProfileRequest in openapi.yaml). */
+const CreateRiderBody = z.object({
+  phoneNumber: z.string().trim().regex(/^\+[1-9]\d{6,14}$/, 'Phone number must be in international format, e.g. +15551234567'),
+  displayName: z.string().trim().min(3).max(24).regex(/^[A-Za-z0-9._]+$/, 'Letters, numbers, dots and underscores only'),
+  homeCity: z.string().trim().min(2).max(60),
+  rideStyle: z.enum(['party_tech', 'networking', 'deep_talks', 'just_chilling']),
+  incognitoDropoff: z.boolean(),
+});
+export type CreateRiderInput = z.infer<typeof CreateRiderBody>;
+
+const SettingsBody =z.object({ values: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])) });
 
 /**
  * Admin panel API (artifacts/admin-web). Not part of the rider OpenAPI contract: admins sign in
@@ -53,9 +63,58 @@ export class AdminController {
     return this.admin.listUsers(search);
   }
 
+  /** Add a rider by phone number; they sign in on the app with that number and land on this profile. */
+  @Post('users')
+  createUser(@Req() req: AdminRequest, @Body() body: unknown) {
+    return this.admin.createUser(parseBody(CreateRiderBody, body), req.user!.email ?? null);
+  }
+
   @Get('users/:uid')
   user(@Param('uid') uid: string) {
     return this.admin.getUser(uid);
+  }
+
+  /** Edit a rider's profile (same fields as Add rider). Changing the phone changes how they sign in. */
+  @Put('users/:uid')
+  updateUser(@Req() req: AdminRequest, @Param('uid') uid: string, @Body() body: unknown) {
+    return this.admin.updateUser(uid, parseBody(CreateRiderBody, body), req.user!.email ?? null);
+  }
+
+  /** "Kill session": end the rider's current ride and take them out of any room. Not a suspension. */
+  @Post('users/:uid/end-ride')
+  @HttpCode(200)
+  endRide(@Req() req: AdminRequest, @Param('uid') uid: string) {
+    return this.admin.endRide(uid, req.user!.email ?? null);
+  }
+
+  /** "Block device": block every phone this rider has used. */
+  @Post('users/:uid/block-devices')
+  @HttpCode(200)
+  blockRiderDevices(@Req() req: AdminRequest, @Param('uid') uid: string, @Body() body: unknown) {
+    return this.admin.blockRiderDevices(uid, parseBody(SuspendBody, body ?? {}).reason ?? null, req.user!.email ?? null);
+  }
+
+  @Get('devices/blocked')
+  blockedDevices() {
+    return this.admin.listBlockedDevices();
+  }
+
+  @Post('devices/:key/block')
+  @HttpCode(200)
+  blockDevice(@Req() req: AdminRequest, @Param('key') key: string, @Body() body: unknown) {
+    return this.admin.setDeviceBlocked(key, true, parseBody(SuspendBody, body ?? {}).reason ?? null, req.user!.email ?? null);
+  }
+
+  @Post('devices/:key/unblock')
+  @HttpCode(200)
+  unblockDevice(@Req() req: AdminRequest, @Param('key') key: string) {
+    return this.admin.setDeviceBlocked(key, false, null, req.user!.email ?? null);
+  }
+
+  /** Permanently delete the rider's account and profile. Reports and safety alerts are kept. */
+  @Delete('users/:uid')
+  deleteUser(@Req() req: AdminRequest, @Param('uid') uid: string) {
+    return this.admin.deleteUser(uid, req.user!.email ?? null);
   }
 
   @Post('users/:uid/suspend')

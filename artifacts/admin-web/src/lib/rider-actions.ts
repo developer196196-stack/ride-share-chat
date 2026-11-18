@@ -24,6 +24,63 @@ export async function reinstateRider(uid: string): Promise<boolean> {
   }
 }
 
+/** "Kill session": ends the rider's current ride and takes them out of any room. */
+export async function endRide(uid: string): Promise<boolean> {
+  try {
+    await adminApi(`/users/${uid}/end-ride`, { method: 'POST', body: {} });
+    toast.success('Session killed. Their ride ended and they left any room.');
+    return true;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not end the ride.');
+    return false;
+  }
+}
+
+export async function deleteRider(uid: string): Promise<boolean> {
+  try {
+    await adminApi(`/users/${uid}`, { method: 'DELETE' });
+    toast.success('Rider account deleted.');
+    return true;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not delete the rider.');
+    return false;
+  }
+}
+
+/** "Block device": every phone the rider has used. Resolves to how many were blocked, or null on failure. */
+export async function blockRiderDevices(uid: string, reason: string | null): Promise<number | null> {
+  try {
+    const { blocked } = await adminApi<{ blocked: number }>(`/users/${uid}/block-devices`, {
+      method: 'POST',
+      body: { reason },
+    });
+    if (blocked === 0)
+      toast.info('No unblocked phones on record for this rider yet. Phones are recorded when they use the app.');
+    else
+      toast.success(
+        `${blocked} phone${blocked === 1 ? '' : 's'} blocked. Anyone using ${blocked === 1 ? 'it' : 'them'} was signed out.`,
+      );
+    return blocked;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not block the device.');
+    return null;
+  }
+}
+
+export async function setDeviceBlocked(key: string, blocked: boolean, reason: string | null = null): Promise<boolean> {
+  try {
+    await adminApi(`/devices/${key}/${blocked ? 'block' : 'unblock'}`, {
+      method: 'POST',
+      body: blocked ? { reason } : {},
+    });
+    toast.success(blocked ? 'Phone blocked. Anyone using it was signed out.' : 'Phone unblocked.');
+    return true;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not update the device.');
+    return false;
+  }
+}
+
 export async function copyText(text: string, what: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);

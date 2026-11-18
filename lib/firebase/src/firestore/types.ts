@@ -54,7 +54,25 @@ export type PushTokenDoc = {
   updatedAt: Timestamp;
 };
 
-export type ContactChannel = 'sms' | 'whatsapp' | 'email';
+/**
+ * `devices/{sha256(deviceId)}`: a phone riders have used (the app sends `x-device-id`). The raw ID
+ * is never stored. A blocked device can't be used by any account.
+ */
+export type DeviceDoc = {
+  platform: 'ios' | 'android';
+  /** e.g. "Samsung SM-S911B" or "iPhone 15". */
+  name: string | null;
+  /** Every rider who has signed in on it. */
+  uids: string[];
+  lastUid: string;
+  lastSeenAt: Timestamp;
+  blocked: boolean;
+  blockedAt: Timestamp | null;
+  blockedBy: string | null;
+  blockedReason: string | null;
+};
+
+export type ContactChannel ='sms' | 'whatsapp' | 'email';
 
 /** `users/{uid}/trustedContacts/{id}` */
 export type TrustedContactDoc = {

@@ -9,6 +9,8 @@ export const FirestoreCollections = {
   appConfig: 'appConfig',
   /** `pushTokens/{sha256(token)}` — one doc per device, owned by the rider signed in on it. */
   pushTokens: 'pushTokens',
+  /** `devices/{sha256(deviceId)}` — phones riders use; the admin panel can block one. */
+  devices: 'devices',
 } as const;
 
 /** Subcollections of `users/{uid}`. */

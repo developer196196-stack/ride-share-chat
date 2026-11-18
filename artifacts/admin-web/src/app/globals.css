@@ -1,75 +1,54 @@
 @import "tailwindcss";
 
+/* Keeps shadcn's `dark:` classes off: they only apply under a `.dark` class, which we never set
+   (Tailwind's default would follow the OS dark setting). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Colours follow the client's RideShare Console: white pages, navy text, brand red and a navy
+ * sidebar. Always light: there is no dark mode.
+ */
 :root {
-  --background: #f8fafc;
-  --foreground: #0b0f19;
-  --card: #ffffff;
-  --card-foreground: #0b0f19;
-  --popover: #ffffff;
-  --popover-foreground: #0b0f19;
-  --primary: #c91a25;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0b0f19;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: rgba(11, 15, 25, 0.05);
-  --accent-foreground: #0b0f19;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #c91a25;
-  
-  --sidebar-background: #f1f5f9;
-  --sidebar-foreground: #0b0f19;
-  --sidebar-primary: #c91a25;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e2e8f0;
-  --sidebar-accent-foreground: #0b0f19;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #c91a25;
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222 39% 14%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 39% 14%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 39% 14%);
+  --primary: hsl(353 81% 49%);
+  --primary-hover: hsl(353 81% 43%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 25% 96%);
+  --secondary-foreground: hsl(222 39% 14%);
+  --muted: hsl(220 25% 97%);
+  --muted-foreground: hsl(220 12% 44%);
+  --accent: hsl(353 90% 97%);
+  --accent-foreground: hsl(353 75% 40%);
+  --destructive: hsl(353 81% 49%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(220 18% 90%);
+  --input: hsl(220 16% 86%);
+  --ring: hsl(353 81% 49%);
+  --grid-line: hsl(220 20% 93%);
+
+  --sidebar-background: hsl(222 41% 12%);
+  --sidebar-foreground: hsl(220 20% 86%);
+  --sidebar-primary: hsl(353 81% 49%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(222 32% 18%);
+  --sidebar-accent-foreground: hsl(0 0% 100%);
+  --sidebar-border: hsl(222 30% 20%);
+  --sidebar-ring: hsl(353 81% 49%);
 }
 
-.dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --popover: #18181b;
-  --popover-foreground: #fafafa;
-  --primary: #ef3b3b;
-  --primary-foreground: #ffffff;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: rgba(239, 59, 59, 0.1);
-  --accent-foreground: #ef3b3b;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #ef3b3b;
-  
-  --sidebar-background: #09090b;
-  --sidebar-foreground: #fafafa;
-  --sidebar-primary: #ef3b3b;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #27272a;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #ef3b3b;
-}
 
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  
+  --font-display: var(--font-bricolage);
+
   --color-sidebar: var(--sidebar-background);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -78,11 +57,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -110,6 +90,14 @@
   ::file-selector-button {
     border-color: var(--border);
   }
+  /* Browser autofill paints inputs light blue; keep them white like the rest of the form. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    -webkit-box-shadow: 0 0 0 1000px var(--card) inset;
+    transition: background-color 9999s ease-out 0s;
+  }
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
@@ -120,4 +108,51 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Console type and texture helpers. */
+@utility font-display {
+  font-family: var(--font-bricolage), var(--font-geist-sans), sans-serif;
+  letter-spacing: -0.025em;
+}
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+@utility eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+@utility grid-bg {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise > * {
+  animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.rise > *:nth-child(2) { animation-delay: 0.04s; }
+.rise > *:nth-child(3) { animation-delay: 0.08s; }
+.rise > *:nth-child(4) { animation-delay: 0.12s; }
+.rise > *:nth-child(5) { animation-delay: 0.16s; }
+.rise > *:nth-child(6) { animation-delay: 0.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .rise > * {
+    animation: none;
+  }
 }

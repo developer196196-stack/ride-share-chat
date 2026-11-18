@@ -5,10 +5,9 @@ import { ArrowRight, Car, Flag, Gauge, Radio, ShieldAlert, UserX, Users } from '
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { VIBE_GROUPS, VIBE_LABELS } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ErrorAlert, PageHeader } from '@/components/page-header';
+import { ErrorAlert, PageHeader, Panel, Stat } from '@/components/page-header';
 
 type Stats = {
   totalRiders: number;
@@ -57,66 +56,49 @@ export default function OverviewPage() {
         </Alert>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.title} href={card.href} className="block">
-              <Card className="h-full transition-colors hover:border-primary/40">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-                  <Icon className={`h-4 w-4 ${card.alert ? 'text-primary' : 'text-muted-foreground'}`} />
-                </CardHeader>
-                <CardContent>
-                  {ready ? <div className="text-3xl font-bold">{card.value ?? 0}</div> : <Skeleton className="h-9 w-16" />}
-                  <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+      <div className="rise grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map((card) => (
+          <Link key={card.title} href={card.href} className="block rounded-lg transition-transform hover:-translate-y-0.5">
+            <Stat label={card.title} value={card.value ?? 0} hint={card.desc} icon={card.icon} accent={card.alert} loading={!ready} />
+          </Link>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Rooms by category</CardTitle>
-            <CardDescription>Live rooms and riders for each room type, by group</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {data
-              ? VIBE_GROUPS.map((group) => {
-                  const rows = group.vibes.map((vibe) => data.byVibe.find((r) => r.vibe === vibe) ?? { vibe, rooms: 0, riders: 0 });
-                  const riders = rows.reduce((a, r) => a + r.riders, 0);
-                  return (
-                    <div key={group.label} className="rounded-lg border p-3 space-y-2">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-sm font-semibold">{group.label}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {riders} rider{riders === 1 ? '' : 's'}
-                        </p>
-                      </div>
-                      {rows.map((row) => (
-                        <div key={row.vibe} className="flex items-baseline justify-between gap-2 text-xs">
-                          <span>{VIBE_LABELS[row.vibe] ?? row.vibe}</span>
-                          <span className="text-muted-foreground">
-                            {row.rooms} room{row.rooms === 1 ? '' : 's'} · {row.riders} rider{row.riders === 1 ? '' : 's'}
-                          </span>
-                        </div>
-                      ))}
+        <Panel
+          className="lg:col-span-2"
+          eyebrow="Live"
+          title="Rooms by category"
+          description="Live rooms and riders for each room type, by group"
+          bodyClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+        >
+          {data
+            ? VIBE_GROUPS.map((group) => {
+                const rows = group.vibes.map((vibe) => data.byVibe.find((r) => r.vibe === vibe) ?? { vibe, rooms: 0, riders: 0 });
+                const riders = rows.reduce((a, r) => a + r.riders, 0);
+                return (
+                  <div key={group.label} className="space-y-2 rounded-md border border-border p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-semibold">{group.label}</p>
+                      <p className="tnum font-mono text-[10.5px] text-muted-foreground">
+                        {riders} rider{riders === 1 ? '' : 's'}
+                      </p>
                     </div>
-                  );
-                })
-              : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-24" />)}
-          </CardContent>
-        </Card>
+                    {rows.map((row) => (
+                      <div key={row.vibe} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span>{VIBE_LABELS[row.vibe] ?? row.vibe}</span>
+                        <span className="tnum font-mono text-[10.5px] text-muted-foreground">
+                          {row.rooms} room{row.rooms === 1 ? '' : 's'} · {row.riders} rider{row.riders === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })
+            : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-24" />)}
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick actions</CardTitle>
-            <CardDescription>Common admin tasks</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel eyebrow="Shortcuts" title="Quick actions" description="Common admin tasks" bodyClassName="space-y-2">
             {[
               { href: '/dashboard/reports', label: 'Review open reports' },
               { href: '/dashboard/riders', label: 'Find a rider' },
@@ -130,8 +112,7 @@ export default function OverviewPage() {
                 </Link>
               </Button>
             ))}
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
     </div>
   );

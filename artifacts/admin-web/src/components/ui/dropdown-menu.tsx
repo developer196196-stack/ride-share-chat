@@ -5,7 +5,14 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+/**
+ * Non-modal by default. Our row menus open dialogs (Suspend, Block device, Delete…); with a modal
+ * menu, Radix can leave `pointer-events: none` on <body> after the dialog closes, freezing the page
+ * until a refresh. The dialog itself is still modal.
+ */
+function DropdownMenu({ modal = false, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+  return <DropdownMenuPrimitive.Root modal={modal} {...props} />;
+}
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
