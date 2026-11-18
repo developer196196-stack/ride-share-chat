@@ -55,6 +55,16 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+let _defaultHeaders: Record<string, string> = {};
+
+/**
+ * Headers sent with every request unless the call sets them itself (e.g. the
+ * mobile app's device ID). Pass `null` to clear.
+ */
+export function setDefaultHeaders(headers: Record<string, string> | null): void {
+  _defaultHeaders = headers ?? {};
+}
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }
@@ -367,6 +377,11 @@ export async function customFetch<T = unknown>(
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
+  }
+
+  // After the token getter, which may update them.
+  for (const [key, value] of Object.entries(_defaultHeaders)) {
+    if (!headers.has(key)) headers.set(key, value);
   }
 
   const requestInfo = { method, url: resolveUrl(input) };

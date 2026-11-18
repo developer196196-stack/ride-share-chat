@@ -50,9 +50,15 @@ export function PushNotificationsHost() {
   }, [isAuthenticated, uid]);
 
   // New token (rare), or notifications switched on in system Settings while the app was away.
+  // The listener also fires whenever the app fetches the token, so react only to a real change.
   useEffect(() => {
     if (!isAuthenticated) return;
-    const tokenSub = Notifications.addPushTokenListener(() => void registerForPush());
+    let lastDeviceToken: unknown = null;
+    const tokenSub = Notifications.addPushTokenListener((t) => {
+      const changed = lastDeviceToken !== null && JSON.stringify(t.data) !== JSON.stringify(lastDeviceToken);
+      lastDeviceToken = t.data;
+      if (changed) void registerForPush();
+    });
     const appSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void registerForPush();
     });

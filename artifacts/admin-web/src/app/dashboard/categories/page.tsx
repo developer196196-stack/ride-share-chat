@@ -1016,7 +1016,7 @@ export default function RoomCategoriesPage() {
       </Dialog>
 
       {dirty ? (
-        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2">
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 lg:left-[calc(50%+116px)]">
           <Card className="shadow-lg">
             <CardContent className="flex items-center gap-4 px-4 py-3">
               <span className="text-sm">Unsaved changes</span>

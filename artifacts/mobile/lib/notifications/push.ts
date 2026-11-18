@@ -11,6 +11,7 @@ import type * as NotificationsModule from 'expo-notifications';
 import { registerPushToken, removePushToken } from '@workspace/api-client-react';
 import { colors } from '@/constants/colors';
 import type { RoomInvitePayload } from '@/lib/realtime/events';
+import { useAuthStore } from '@/stores/auth.store';
 import { useTripStore } from '@/stores/trip.store';
 
 /** `data` the API puts on each notification (artifacts/api-nest/src/notifications/push.service.ts). */
@@ -87,16 +88,35 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 let registeredToken: string | null = null;
+/** `${uid}|${token}` last sent to the API, so the same pair isn't posted again. */
+let registeredFor: string | null = null;
+let inFlight: Promise<string | null> | null = null;
 
-/** Sends this device's push token to the API (signed in, permission granted, real device). */
-export async function registerForPush(): Promise<string | null> {
+/**
+ * Sends this device's push token to the API (signed in, permission granted, real device).
+ * Calls made while one is running share it, and an unchanged token for the same rider isn't
+ * posted again. (Fetching the token fires Expo's push-token listener, so without this the
+ * listener → register → fetch cycle would loop.)
+ */
+export function registerForPush(): Promise<string | null> {
+  inFlight ??= doRegister().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function doRegister(): Promise<string | null> {
   if (!Notifications || !Device.isDevice) return null;
   if ((await getNotificationPermission()) !== 'granted') return null;
   try {
     configureNotifications();
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     const { data: token } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    await registerPushToken({ token, platform: Platform.OS as 'ios' | 'android' });
+    const key = `${useAuthStore.getState().user?.uid ?? ''}|${token}`;
+    if (key !== registeredFor) {
+      await registerPushToken({ token, platform: Platform.OS as 'ios' | 'android' });
+      registeredFor = key;
+    }
     registeredToken = token;
     return token;
   } catch (err) {
@@ -110,6 +130,7 @@ export async function registerForPush(): Promise<string | null> {
 export async function unregisterPush(): Promise<void> {
   const token = registeredToken;
   registeredToken = null;
+  registeredFor = null;
   if (!token) return;
   await removePushToken({ token }).catch(() => undefined);
 }

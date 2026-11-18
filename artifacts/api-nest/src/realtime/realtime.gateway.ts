@@ -15,6 +15,7 @@ import { loadAppConfig } from '../config/configuration';
 import { resolvePublicBaseUrl } from '../common/public-base-url';
 import { isSuspended, SUSPENDED_MESSAGE } from '../common/suspension';
 import { REDIS } from '../redis/redis.module';
+import { DEVICE_BLOCKED_MESSAGE, DevicesService, readDevice } from '../devices/devices.service';
 import { ChatService } from '../chat/chat.service';
 import { SafetyService } from '../safety/safety.service';
 import { ValidationService } from '../validation/validation.service';
@@ -57,6 +58,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     private readonly chat: ChatService,
     private readonly safety: SafetyService,
     @Inject(REDIS) private readonly redis: Redis | null,
+    private readonly devices: DevicesService,
   ) {}
 
   afterInit(server: Server): void {
@@ -74,6 +76,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
       const decoded = await verifyIdToken(token);
       if (await isSuspended(this.redis, decoded.uid)) {
         client.emit('AUTH_ERROR', { code: 'ACCOUNT_SUSPENDED', message: SUSPENDED_MESSAGE });
+        client.disconnect(true);
+        return;
+      }
+      const device = readDevice(client.handshake.auth?.deviceId, null);
+      if (device && (await this.devices.isBlocked(device.id))) {
+        client.emit('AUTH_ERROR', { code: 'DEVICE_BLOCKED', message: DEVICE_BLOCKED_MESSAGE });
         client.disconnect(true);
         return;
       }

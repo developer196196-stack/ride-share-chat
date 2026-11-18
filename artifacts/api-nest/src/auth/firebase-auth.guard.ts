@@ -16,9 +16,10 @@ import { FIREBASE_CONFIGURED } from '../firebase/firebase.tokens';
 import type { ErrorResponseBody } from '../common/error-response';
 import { isSuspended, SUSPENDED_MESSAGE } from '../common/suspension';
 import { REDIS } from '../redis/redis.module';
+import { DEVICE_BLOCKED_MESSAGE, DevicesService, readDevice } from '../devices/devices.service';
 
 export type AuthenticatedRequest = {
-  headers: { authorization?: string };
+  headers: { authorization?: string; 'x-device-id'?: string; 'x-device-name'?: string };
   user?: DecodedIdToken;
 };
 
@@ -29,6 +30,9 @@ export class FirebaseAuthGuard implements CanActivate {
   constructor(
     @Inject(FIREBASE_CONFIGURED) private readonly firebaseConfigured: boolean,
     @Optional() @Inject(REDIS) private readonly redis: Redis | null = null,
+    // Explicit token: a `DevicesService | null` type compiles to `Object`, which Nest can't resolve
+    // (and @Optional would then silently inject null, skipping every device check).
+    @Optional() @Inject(DevicesService) private readonly devices: DevicesService | null = null,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -79,6 +83,16 @@ export class FirebaseAuthGuard implements CanActivate {
     if (await isSuspended(this.redis, decoded.uid)) {
       const body: ErrorResponseBody = { code: 'ACCOUNT_SUSPENDED', message: SUSPENDED_MESSAGE };
       throw new ForbiddenException(body);
+    }
+
+    // The mobile app sends its device ID; a blocked phone can't be used with any account.
+    const device = readDevice(request.headers['x-device-id'], request.headers['x-device-name']);
+    if (device && this.devices) {
+      if (await this.devices.isBlocked(device.id)) {
+        const body: ErrorResponseBody = { code: 'DEVICE_BLOCKED', message: DEVICE_BLOCKED_MESSAGE };
+        throw new ForbiddenException(body);
+      }
+      void this.devices.record(decoded.uid, device);
     }
     request.user = decoded;
     return true;

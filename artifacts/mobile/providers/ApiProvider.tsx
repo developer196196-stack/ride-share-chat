@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
+import { setAuthTokenGetter, setBaseUrl, setDefaultHeaders } from '@workspace/api-client-react';
 import { env } from '@/lib/config/env';
+import { deviceHeaders, getDeviceIdentity } from '@/lib/device/device-id';
 import { useAuthStore } from '@/stores/auth.store';
 
 type ApiProviderProps = {
@@ -9,7 +10,11 @@ type ApiProviderProps = {
 
 function bindApiClient(): void {
   setBaseUrl(env.apiUrl);
-  setAuthTokenGetter(() => useAuthStore.getState().getIdToken());
+  setAuthTokenGetter(async () => {
+    // The device ID goes with every signed-in request so a blocked phone is refused.
+    setDefaultHeaders(deviceHeaders(await getDeviceIdentity()));
+    return useAuthStore.getState().getIdToken();
+  });
 }
 
 let didLogBaseUrl = false;

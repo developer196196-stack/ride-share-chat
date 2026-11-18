@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Copy, ExternalLink, MapPin, UserRound } from 'lucide-react';
+import { BlockedDevicesPanel } from '@/components/blocked-devices-panel';
 import { useAdminQuery } from '@/hooks/use-admin-query';
 import { formatDate } from '@/lib/api';
 import { copyText } from '@/lib/rider-actions';
@@ -31,7 +32,7 @@ export default function SafetyPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Safety Alerts" description="Trip shares and emergency alerts riders sent to their trusted contacts." />
+      <PageHeader title="Safety Alerts" description="Trip shares and emergency alerts riders sent to their trusted contacts, and blocked devices." />
       {error ? <ErrorAlert message={error} onRetry={() => void reload()} /> : null}
 
       <Card>
@@ -103,6 +104,8 @@ export default function SafetyPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <BlockedDevicesPanel />
     </div>
   );
 }

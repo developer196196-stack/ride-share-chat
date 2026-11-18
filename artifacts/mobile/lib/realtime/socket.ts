@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import { env } from '@/lib/config/env';
+import { getDeviceIdentity } from '@/lib/device/device-id';
 import { useAuthStore } from '@/stores/auth.store';
 import type { Ack } from './events';
 
@@ -18,10 +19,8 @@ export function connectRealtime(): Socket {
     reconnectionDelay: 1_000,
     reconnectionDelayMax: 10_000,
     auth: (cb) => {
-      void useAuthStore
-        .getState()
-        .getIdToken()
-        .then((token) => cb({ token }))
+      void Promise.all([useAuthStore.getState().getIdToken(), getDeviceIdentity()])
+        .then(([token, device]) => cb({ token, deviceId: device?.id ?? null }))
         .catch(() => cb({ token: null }));
     },
   });
